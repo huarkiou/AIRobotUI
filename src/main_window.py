@@ -44,7 +44,7 @@ class MainWindow:
         self.root.withdraw()
 
     def _create_text_widget(self, parent: ttk.Frame) -> tk.Text:
-        """Create a read-only text widget with Clear button."""
+        """Create a read-only text widget with Clear button at bottom."""
         frame = tk.Frame(parent)
         frame.pack(fill=tk.BOTH, expand=True)
 
@@ -60,7 +60,7 @@ class MainWindow:
             bg="white",
             fg="black",
             insertbackground="black",
-            font=("Consolas", 10),
+            font=("Microsoft YaHei", 10),
             wrap=tk.WORD,
             state=tk.DISABLED,
             yscrollcommand=scrollbar.set,
@@ -68,13 +68,11 @@ class MainWindow:
         text.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=text.yview)
 
-        # Clear button (created after text so closure captures it)
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill=tk.X, before=text_frame)
+        # Clear button at bottom
         tk.Button(
-            toolbar, text="Clear",
+            frame, text="Clear",
             command=lambda t=text: self._clear_tab(t),
-        ).pack(side=tk.RIGHT, padx=2, pady=2)
+        ).pack(side=tk.BOTTOM, pady=(2, 0))
 
         # Right-click context menu
         context_menu = tk.Menu(text, tearoff=0)
