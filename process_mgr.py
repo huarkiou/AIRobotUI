@@ -217,19 +217,34 @@ class ProcessManager:
         logger.info("Stopping %s PID=%d", pname, pid)
         # Prevent auto-restart
         setattr(self, self._restart_attr(name), self._max_restarts)
+
+        # Step 1: Graceful - taskkill without /f sends WM_CLOSE
+        # This lets NapCat gracefully close QQ.exe and release DLL handles
         try:
-            proc.terminate()
+            subprocess.run(
+                ["taskkill", "/pid", str(pid)],
+                capture_output=True, timeout=4,
+            )
         except Exception:
             pass
+
+        # Step 2: Wait for graceful exit
         try:
-            proc.wait(timeout=3)
+            proc.wait(timeout=5)
             logger.info("%s stopped gracefully", pname)
+            self._set_proc(name, None)
+            self._emit_status()
+            return
         except subprocess.TimeoutExpired:
-            logger.warning("%s not responding, killing", pname)
-            try:
-                proc.kill()
-                proc.wait(timeout=2)
-            except Exception:
-                pass
+            logger.warning("%s did not stop gracefully, force killing", pname)
+
+        # Step 3: Force kill process tree
+        try:
+            subprocess.run(
+                ["taskkill", "/f", "/t", "/pid", str(pid)],
+                capture_output=True, timeout=5,
+            )
+        except Exception:
+            pass
         self._set_proc(name, None)
         self._emit_status()
