@@ -64,16 +64,7 @@ class TrayUI:
 
     def _make_status_submenu(self, name: str) -> Menu:
         def _toggle(icon, item):
-            if name == "napcat":
-                if self._pm.is_napcat_running():
-                    self._pm.stop_napcat()
-                else:
-                    self._pm.start_napcat()
-            else:
-                if self._pm.is_astrbot_running():
-                    self._pm.stop_astrbot()
-                else:
-                    self._pm.start_astrbot()
+            self._on_toggle(name)
             self._refresh_icon()
 
         def _status_text(_):
@@ -107,13 +98,28 @@ class TrayUI:
         # Rebuild menu to reflect updated status text
         self._icon.menu = self._build_menu()
 
-    # --- Actions ---
+    # --- Actions (all run in background thread to keep tray responsive) ---
+
+    def _on_toggle(self, name: str) -> None:
+        """Toggle a process - runs in background thread."""
+        def _toggle():
+            if name == "napcat":
+                if self._pm.is_napcat_running():
+                    self._pm.stop_napcat()
+                else:
+                    self._pm.start_napcat()
+            else:
+                if self._pm.is_astrbot_running():
+                    self._pm.stop_astrbot()
+                else:
+                    self._pm.start_astrbot()
+        threading.Thread(target=_toggle, daemon=True, name=f"toggle-{name}").start()
 
     def _on_start_all(self, icon, item) -> None:
-        self._pm.start_all()
+        threading.Thread(target=self._pm.start_all, daemon=True, name="start-all").start()
 
     def _on_stop_all(self, icon, item) -> None:
-        self._pm.stop_all()
+        threading.Thread(target=self._pm.stop_all, daemon=True, name="stop-all").start()
 
     def _on_show_window(self, icon, item) -> None:
         self._window.root.after(0, self._window.show)

@@ -263,42 +263,35 @@ class ProcessManager:
         logger.info("Stopping %s (PID: %d)...", proc_name, pid)
         self._set_restart_count(name, self._max_restarts)  # Prevent auto-restart
 
-        # Close stdout pipe first to release any held file handles
+        # Close stdout pipe first
         try:
             if proc.stdout:
                 proc.stdout.close()
         except Exception:
             pass
 
-        # On Windows, use taskkill /f /t for robust process tree killing
+        # Kill the process (non-blocking)
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+        # On Windows, also try taskkill to clean up child process tree
+        # Run as fire-and-forget (don't block waiting for it)
         if sys.platform == "win32":
             try:
-                subprocess.run(
+                subprocess.Popen(
                     ["taskkill", "/f", "/t", "/pid", str(pid)],
-                    capture_output=True,
-                    timeout=5,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
-                logger.info("%s killed via taskkill", proc_name)
-            except Exception as e:
-                logger.warning("taskkill failed for %s: %s", proc_name, e)
-        else:
-            try:
-                proc.terminate()
             except Exception:
                 pass
-            try:
-                proc.wait(timeout=3)
-                logger.info("%s stopped gracefully", proc_name)
-            except subprocess.TimeoutExpired:
-                logger.warning("%s did not stop, force killing", proc_name)
-                try:
-                    proc.kill()
-                    proc.wait(timeout=2)
-                except Exception:
-                    pass
 
+        # Mark as stopped immediately (don't wait for process to die)
         self._set_proc(name, None)
         self._notify_output(name, f"[SYSTEM] {proc_name} stopped")
+        logger.info("%s stop command sent", proc_name)
         self._notify_status()
 
     def _monitor_loop(self) -> None:
