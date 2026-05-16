@@ -12,29 +12,21 @@ class ConfigDialog:
     def __init__(self, root: tk.Tk) -> None:
         self._logger = get_main_logger()
         self._result: dict | None = None
-        self._root_was_hidden = False
 
         self.dialog = tk.Toplevel(root)
         self.dialog.title("AIRobotUI - Settings")
         self.dialog.geometry("550x380")
         self.dialog.resizable(False, False)
         self.dialog.transient(root)
-
-        # Show root briefly so grab_set works, then re-hide after dialog closes
-        root_was_hidden = not root.winfo_viewable()
-        if root_was_hidden:
-            root.deiconify()
-            root.update_idletasks()
-            self._root_was_hidden = True
-
-        self.dialog.grab_set()
+        self.dialog.focus_force()
+        self.dialog.lift()
 
         # Prevent closing if no config exists (first run)
         self._blocking = load_config() is None
         if self._blocking:
             self.dialog.protocol("WM_DELETE_WINDOW", lambda: None)
         else:
-            self.dialog.protocol("WM_DELETE_WINDOW", self._on_close)
+            self.dialog.protocol("WM_DELETE_WINDOW", self.dialog.destroy)
 
         self._build_ui()
         self._load_current_config()
@@ -172,12 +164,6 @@ class ConfigDialog:
             return f"AstrBot directory does not exist:\n{self.astrbot_cwd.get()}"
         return None
 
-    def _on_close(self) -> None:
-        """Handle dialog close - re-hide root if needed."""
-        if self._root_was_hidden:
-            self.dialog.master.withdraw()
-        self.dialog.destroy()
-
     def _on_save(self) -> None:
         error = self._validate()
         if error:
@@ -208,7 +194,7 @@ class ConfigDialog:
                 disable_autostart()
 
             self._result = config
-            self._on_close()
+            self.dialog.destroy()
         else:
             messagebox.showerror(
                 "Error", "Failed to save configuration.", parent=self.dialog
@@ -216,7 +202,7 @@ class ConfigDialog:
 
     def _on_cancel(self) -> None:
         self._result = None
-        self._on_close()
+        self.dialog.destroy()
 
     def get_result(self) -> dict | None:
         """Wait for dialog and return config dict, or None if cancelled."""
