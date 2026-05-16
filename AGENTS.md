@@ -45,3 +45,31 @@
 - **遇到进程管理问题，先在 cmd 里手动跑 `taskkill` 测试**。写 Python 测试脚本比反复改代码打包快 10 倍。
 - 单实例保护：Windows 命名 Mutex（`CreateMutexW` + `ERROR_ALREADY_EXISTS`）。
 - 锁文件清理：AstrBot 的 `astrbot.lock` 需要在启动前删除，否则会拒绝启动。
+
+## tkinter 窗口与对话框
+
+- **`root.withdraw()` 有副作用**：隐藏主窗口后，`Toplevel` 无法映射到屏幕（`deiconify()` / `wm_deiconify()` / `focus_force()` 全部无效）。
+- **正确做法**：打开对话框时临时 `root.attributes('-alpha', 0)`（透明）→ `deiconify()` → 创建 `Toplevel` → `grab_set()` → `withdraw()` → `alpha=1`。用户看不到主窗口，grab 正常工作。
+- `root.quit()` 退出 mainloop，不能在 `after()` 回调里直接 `destroy()`。
+- 窗口居中：`winfo_screenwidth/height` 减窗口宽高除以 2。
+- 配置窗口相对父窗口居中：`root.winfo_x/y/width/height` 计算偏移。
+- **`Toggle` 最佳实践**：可见时先 `deiconify/lift/focus_force` 闪到前台，再 `after(150, hide)` 隐藏，既提醒用户又可靠。
+
+## 输出面板优化
+
+- 进程输出高频时（如 AstrBot 启动爆发 300+ 行），每行都 `root.after()` 会导致 tkinter 事件队列积压卡顿。
+- **限流方案**：reader 线程推 `queue.Queue`，主线程 100ms 轮询 drain 到内存 buffer，每 N ms 批量 `insert` 到 Text widget。默认 N=500ms（每秒 2 次），可配置。
+- 退出前 flush 残留 buffer。
+
+## tkinter 字体
+
+- tkinter 的 `font` 参数**不支持 CSS 式多字体 fallback**。tuple `(family1, family2, size)` 会报 `expected integer`。
+- 中文 Windows 用 `Microsoft YaHei`，系统字体链接自动回退到 `Segoe UI Emoji` 显示 emoji。
+- 不要用 `Consolas`（无中文字形），`Segoe UI` 在某些系统上渲染异常。
+
+## 项目目录规范
+
+- 采用 `src/` `assets/` `tests/` 结构。
+- `main.pyw` 入口在 `src/` 下，用 `sys.path.insert(0, os.path.dirname(__file__))`。
+- PyInstaller entry 改为 `src/main.pyw`，`--icon assets/icon.ico`。
+- `startup.py` 找 `airobotui.bat` 需 `os.path.dirname` 再上一级到项目根。
