@@ -221,10 +221,10 @@ class ProcessManager:
         # Step 1: Graceful - taskkill without /f sends WM_CLOSE
         # This lets NapCat gracefully close QQ.exe and release DLL handles
         try:
-            subprocess.run(
-                ["taskkill", "/pid", str(pid)],
-                capture_output=True, timeout=4,
-            )
+            kwargs = {"capture_output": True, "timeout": 4}
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            subprocess.run(["taskkill", "/pid", str(pid)], **kwargs)
         except Exception:
             pass
 
@@ -240,10 +240,10 @@ class ProcessManager:
 
         # Step 3: Force kill process tree
         try:
-            subprocess.run(
-                ["taskkill", "/f", "/t", "/pid", str(pid)],
-                capture_output=True, timeout=5,
-            )
+            kwargs = {"capture_output": True, "timeout": 5}
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            subprocess.run(["taskkill", "/f", "/t", "/pid", str(pid)], **kwargs)
         except Exception:
             pass
         self._set_proc(name, None)
