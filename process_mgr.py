@@ -217,44 +217,22 @@ class ProcessManager:
         logger.info("Stopping %s PID=%d", pname, pid)
         setattr(self, self._restart_attr(name), self._max_restarts)
 
-        # Step 1: Quick graceful attempt - taskkill sends WM_CLOSE
-        # Returns fast; if process handles it, it'll die within the wait below
+        # taskkill /f /t kills entire process tree (including QQ.exe for NapCat)
+        # Tested: 0.3s, reliable, no orphans. WM_CLOSE doesn't work for either process.
         if sys.platform == "win32":
-            try:
-                subprocess.run(
-                    ["taskkill", "/pid", str(pid)],
-                    capture_output=True, timeout=2,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-            except Exception:
-                pass
-
-        # Step 2: Wait briefly for graceful exit
-        try:
-            proc.wait(timeout=3)
-            logger.info("%s stopped gracefully", pname)
-            self._set_proc(name, None)
-            self._emit_status()
-            return
-        except subprocess.TimeoutExpired:
-            pass
-
-        # Step 3: Force kill process tree
-        logger.warning("%s not stopping, force killing", pname)
-        if sys.platform == "win32":
-            try:
-                subprocess.run(
-                    ["taskkill", "/f", "/t", "/pid", str(pid)],
-                    capture_output=True, timeout=3,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-            except Exception:
-                pass
+            subprocess.run(
+                ["taskkill", "/f", "/t", "/pid", str(pid)],
+                capture_output=True, timeout=3,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
         else:
             try:
-                proc.kill()
+                proc.terminate()
                 proc.wait(timeout=2)
             except Exception:
-                pass
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
         self._set_proc(name, None)
         self._emit_status()
