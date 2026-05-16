@@ -15,9 +15,10 @@ def _get_exe_path() -> str:
         # Running as compiled EXE
         return sys.executable
     else:
-        # Running from source - use batch file
+        # Running from source - use batch file in project root
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        bat_path = os.path.join(script_dir, "airobotui.bat")
+        project_root = os.path.dirname(script_dir)
+        bat_path = os.path.join(project_root, "airobotui.bat")
         if os.path.exists(bat_path):
             return bat_path
         return sys.executable
