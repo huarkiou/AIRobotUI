@@ -1,11 +1,11 @@
-"""AIRobotUI - Windows system tray controller for NapCat QQ and AstrBot."""
-
+"""AIRobotUI - tray controller for NapCat QQ and AstrBot."""
 import sys
 import os
+import time
 
-# Ensure script directory is on path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from single_instance import ensure_single_instance
 from logger import get_main_logger
 from config import load_config, get_default_config, save_config
 from process_mgr import ProcessManager
@@ -16,43 +16,40 @@ from tray_ui import TrayUI
 
 def main() -> None:
     logger = get_main_logger()
+
+    # --- Single instance ---
+    if not ensure_single_instance():
+        logger.warning("Another instance is already running, exiting")
+        import tkinter.messagebox
+        tkinter.messagebox.showwarning(
+            "AIRobotUI", "AIRobotUI is already running."
+        )
+        return
+
     logger.info("=" * 40)
     logger.info("AIRobotUI starting...")
 
-    # Step 1: Create main window (needed for config dialog parent)
     window = MainWindow()
 
-    # Step 2: Load or create config
     is_first = load_config() is None
+    config = get_default_config() if is_first else load_config()
     if is_first:
-        logger.info("No config found, using defaults")
-        config = get_default_config()
         save_config(config)
-    else:
-        config = load_config()
 
-    # Step 3: Initialize process manager
     pm = ProcessManager(config)
-
-    # Step 4: Wire output to main window
-    pm.on_output(window.append_output)
-
-    # Step 5: Create tray UI
     tray = TrayUI(pm, window, config)
 
-    # Step 6: Settings callback (thread-safe via root.after, guarded against re-entry)
     _settings_open = False
 
     def open_settings() -> None:
         nonlocal _settings_open
         if _settings_open:
-            logger.info("Settings dialog already open, ignoring")
             return
         _settings_open = True
         logger.info("Opening settings dialog")
         try:
-            dialog = ConfigDialog(window.root)
-            result = dialog.get_result()
+            dlg = ConfigDialog(window.root)
+            result = dlg.get_result()
             if result is not None:
                 pm.update_config(result)
                 logger.info("Config updated at runtime")
@@ -61,42 +58,69 @@ def main() -> None:
 
     tray.set_config_callback(open_settings)
 
-    # Step 7: First-run: show config dialog after mainloop starts
+    # --- Main event tick (runs on tkinter main thread) ---
+    POLL_INTERVAL_MS = 2000
+    _last_poll = 0
+
+    def _tick() -> None:
+        nonlocal _last_poll
+
+        # 1. Consume pending tray action
+        action = tray.consume_action()
+        if action:
+            logger.info("Action: %s", action)
+            if action == "start:all":
+                pm.start_all()
+            elif action == "stop:all":
+                pm.stop_all()
+            elif action == "start:napcat":
+                pm.start_napcat()
+            elif action == "stop:napcat":
+                pm.stop_napcat()
+            elif action == "start:astrbot":
+                pm.start_astrbot()
+            elif action == "stop:astrbot":
+                pm.stop_astrbot()
+
+        # 2. Drain output to window
+        for line in pm.drain_napcat():
+            window.append_output("NapCat", line)
+        for line in pm.drain_astrbot():
+            window.append_output("AstrBot", line)
+
+        # 3. Periodic crash poll
+        now = time.monotonic() * 1000
+        if now - _last_poll >= POLL_INTERVAL_MS:
+            _last_poll = now
+            pm.poll_crashes()
+
+        # 4. Exit check
+        if tray._exit_requested:
+            logger.info("Exit: hiding window, shutting down...")
+            window.hide()
+            pm.shutdown()
+            window.root.quit()
+            return
+
+        window.root.after(100, _tick)
+
+    # --- Setup ---
     if is_first:
-        logger.info("Scheduling first-run settings dialog...")
         window.root.after(300, open_settings)
 
-    # Step 8: Start tray in background thread (non-blocking)
-    logger.info("Starting tray in background thread...")
     tray.run()
+    window.root.after(100, _tick)
 
-    # Step 9: Start exit poller on main thread (checks tray._exit_requested)
-    def _poll_exit():
-        if tray._exit_requested:
-            logger.info("Exit requested, shutting down from main thread...")
-            try:
-                pm.shutdown()
-            except Exception as e:
-                logger.error("Shutdown error: %s", e)
-            window.root.quit()  # Safe exit from mainloop (don't destroy() inside after callback)
-        else:
-            window.root.after(500, _poll_exit)
-
-    window.root.after(500, _poll_exit)
-
-    # Step 10: Run tkinter mainloop in main thread
     logger.info("Entering tkinter main loop")
     window.root.mainloop()
 
-    # Step 11: Cleanup after mainloop exits
+    # --- Cleanup ---
     logger.info("Mainloop exited, cleaning up...")
     try:
         window.destroy()
     except Exception:
         pass
-    import time
-    time.sleep(0.5)  # Let OS release file handles
-
+    time.sleep(0.5)
     logger.info("AIRobotUI exited")
 
 
