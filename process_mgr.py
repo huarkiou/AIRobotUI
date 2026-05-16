@@ -197,6 +197,13 @@ class ProcessManager:
         try:
             args = shlex.split(cmd)
 
+            # Resolve executable relative to cwd if it's a bare filename
+            exe_path = args[0]
+            if not os.path.isabs(exe_path) and os.sep not in exe_path and '/' not in exe_path:
+                resolved = os.path.join(cwd, exe_path)
+                if os.path.exists(resolved):
+                    args[0] = resolved
+
             # Determine encoding from config
             proc_encoding = proc_config.get("encoding", "utf-8")
 
@@ -260,14 +267,7 @@ class ProcessManager:
         logger.info("Stopping %s (PID: %d)...", proc_name, pid)
         self._set_restart_count(name, self._max_restarts)
 
-        # Close stdout pipe
-        try:
-            if proc.stdout:
-                proc.stdout.close()
-        except Exception:
-            pass
-
-        # Step 1: Graceful terminate
+        # Step 1: Terminate the process FIRST (this closes write pipe, unblocks reader)
         try:
             proc.terminate()
         except Exception:
@@ -292,7 +292,14 @@ class ProcessManager:
             except Exception:
                 pass
 
-        # Step 4: Kill entire process tree (catches orphans from shims/wrappers)
+        # Step 4: Close our end of the pipe (reader should already be done)
+        try:
+            if proc.stdout:
+                proc.stdout.close()
+        except Exception:
+            pass
+
+        # Step 5: Kill entire process tree as final cleanup
         if sys.platform == "win32":
             try:
                 subprocess.run(
