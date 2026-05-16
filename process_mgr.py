@@ -1,19 +1,13 @@
-"""Process manager for NapCat QQ and AstrBot - lifecycle, monitoring, output capture."""
+"""Process manager - all Popen operations on calling thread (assumed main)."""
 
 import subprocess
 import sys
 import threading
-import time
+import queue
 import shlex
 import os
 import logging
-from typing import Callable
 from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
-
-
-StatusCallback = Callable[[], None]
-OutputCallback = Callable[[str, str], None]  # (process_name, line)
-NotifyCallback = Callable[[str, str], None]  # (title, message)
 
 
 class ProcessManager:
@@ -21,379 +15,221 @@ class ProcessManager:
         self._config = config
         self._napcat_proc: subprocess.Popen | None = None
         self._astrbot_proc: subprocess.Popen | None = None
-        self._napcat_restart_count = 0
-        self._astrbot_restart_count = 0
+        self._napcat_restarts = 0
+        self._astrbot_restarts = 0
         self._max_restarts = 3
-        self._monitor_running = False
-        self._monitor_thread: threading.Thread | None = None
-        self._output_callbacks: list[OutputCallback] = []
-        self._status_callbacks: list[StatusCallback] = []
-        self._notify_callbacks: list[NotifyCallback] = []
-        self._manual_stop: set[str] = set()  # Track manual stops vs crashes
+        self._napcat_queue: queue.Queue[str] = queue.Queue()
+        self._astrbot_queue: queue.Queue[str] = queue.Queue()
+        self._status_listeners: list[callable] = []
+        self._notify_listeners: list[callable] = []
 
     # --- Public API ---
 
     def update_config(self, config: dict) -> None:
-        """Update config without stopping running processes."""
         self._config = config
 
-    def on_status_change(self, callback: StatusCallback) -> None:
-        self._status_callbacks.append(callback)
+    def on_status_change(self, cb: callable) -> None:
+        self._status_listeners.append(cb)
 
-    def on_output(self, callback: OutputCallback) -> None:
-        self._output_callbacks.append(callback)
+    def on_notification(self, cb: callable) -> None:
+        self._notify_listeners.append(cb)
 
-    def on_notification(self, callback: NotifyCallback) -> None:
-        self._notify_callbacks.append(callback)
+    def start_napcat(self) -> None: self._start("napcat")
+    def start_astrbot(self) -> None: self._start("astrbot")
+    def stop_napcat(self) -> None: self._stop("napcat")
+    def stop_astrbot(self) -> None: self._stop("astrbot")
+    def start_all(self) -> None: self.start_napcat(); self.start_astrbot()
+    def stop_all(self) -> None: self.stop_napcat(); self.stop_astrbot()
+    def shutdown(self) -> None: self.stop_all()
 
-    def start_all(self) -> None:
-        self.start_napcat()
-        self.start_astrbot()
+    def is_napcat_running(self) -> bool: return self._running("napcat")
+    def is_astrbot_running(self) -> bool: return self._running("astrbot")
 
-    def stop_all(self) -> None:
-        self.stop_napcat()
-        self.stop_astrbot()
+    def poll_crashes(self) -> None:
+        """Check for unexpected exits; auto-restart or notify."""
+        for name in ("napcat", "astrbot"):
+            proc = self._get_proc(name)
+            if proc is None:
+                continue
+            ret = proc.poll()
+            if ret is not None:
+                pname = self._name(name)
+                logger = get_main_logger()
+                count = self._restart_count(name)
+                self._set_proc(name, None)
+                logger.warning("%s exited code=%d restarts=%d/%d",
+                               pname, ret, count, self._max_restarts)
+                if count < self._max_restarts:
+                    self._inc_restart(name)
+                    self._notify(
+                        f"{pname} Crashed",
+                        f"Auto-restarting ({count + 1}/{self._max_restarts})...",
+                    )
+                    self._start(name)
+                else:
+                    self._notify(
+                        f"{pname} Stopped",
+                        "Max restart attempts reached.",
+                    )
 
-    def start_napcat(self) -> None:
-        self._start_process("napcat")
+    def drain_napcat(self) -> list[str]:
+        return self._drain(self._napcat_queue)
 
-    def start_astrbot(self) -> None:
-        self._start_process("astrbot")
-
-    def stop_napcat(self) -> None:
-        self._stop_process("napcat")
-
-    def stop_astrbot(self) -> None:
-        self._stop_process("astrbot")
-
-    def is_napcat_running(self) -> bool:
-        return self._is_running("napcat")
-
-    def is_astrbot_running(self) -> bool:
-        return self._is_running("astrbot")
-
-    def start_monitor(self) -> None:
-        """Start the background monitor thread."""
-        if self._monitor_running:
-            return
-        self._monitor_running = True
-        self._monitor_thread = threading.Thread(
-            target=self._monitor_loop, daemon=True
-        )
-        self._monitor_thread.start()
-
-    def stop_monitor(self) -> None:
-        """Stop the background monitor thread."""
-        self._monitor_running = False
+    def drain_astrbot(self) -> list[str]:
+        return self._drain(self._astrbot_queue)
 
     # --- Internal ---
 
-    def _proc_name(self, name: str) -> str:
-        return "NapCat" if name == "napcat" else "AstrBot"
+    def _drain(self, q: queue.Queue) -> list[str]:
+        lines: list[str] = []
+        while True:
+            try:
+                lines.append(q.get_nowait())
+            except queue.Empty:
+                break
+        return lines
 
-    def _proc_config(self, name: str) -> dict:
-        return self._config[name]
+    def _name(self, n: str) -> str:
+        return "NapCat" if n == "napcat" else "AstrBot"
 
-    def _proc_attr(self, name: str) -> str:
-        return "_napcat_proc" if name == "napcat" else "_astrbot_proc"
+    def _proc_attr(self, n: str) -> str:
+        return "_napcat_proc" if n == "napcat" else "_astrbot_proc"
 
-    def _restart_count_attr(self, name: str) -> str:
-        return (
-            "_napcat_restart_count" if name == "napcat"
-            else "_astrbot_restart_count"
-        )
+    def _restart_attr(self, n: str) -> str:
+        return "_napcat_restarts" if n == "napcat" else "_astrbot_restarts"
 
-    def _get_proc(self, name: str) -> subprocess.Popen | None:
-        return getattr(self, self._proc_attr(name))
+    def _get_proc(self, n: str) -> subprocess.Popen | None:
+        return getattr(self, self._proc_attr(n))
 
-    def _set_proc(self, name: str, proc: subprocess.Popen | None) -> None:
-        setattr(self, self._proc_attr(name), proc)
+    def _set_proc(self, n: str, p: subprocess.Popen | None) -> None:
+        setattr(self, self._proc_attr(n), p)
 
-    def _get_restart_count(self, name: str) -> int:
-        return getattr(self, self._restart_count_attr(name))
+    def _restart_count(self, n: str) -> int:
+        return getattr(self, self._restart_attr(n))
 
-    def _set_restart_count(self, name: str, value: int) -> None:
-        setattr(self, self._restart_count_attr(name), value)
+    def _inc_restart(self, n: str) -> None:
+        setattr(self, self._restart_attr(n), self._restart_count(n) + 1)
 
-    def _is_running(self, name: str) -> bool:
-        proc = self._get_proc(name)
-        return proc is not None and proc.poll() is None
+    def _reset_restart(self, n: str) -> None:
+        setattr(self, self._restart_attr(n), 0)
 
-    def _get_logger(self, name: str) -> logging.Logger:
-        if name == "napcat":
-            return get_napcat_logger()
-        return get_astrbot_logger()
+    def _running(self, n: str) -> bool:
+        p = self._get_proc(n)
+        return p is not None and p.poll() is None
 
-    def _notify_status(self) -> None:
-        for cb in self._status_callbacks:
+    def _notify(self, title: str, msg: str) -> None:
+        for cb in self._notify_listeners:
+            try:
+                cb(title, msg)
+            except Exception:
+                pass
+
+    def _emit_status(self) -> None:
+        for cb in self._status_listeners:
             try:
                 cb()
             except Exception:
                 pass
 
-    def _notify_output(self, name: str, line: str) -> None:
-        proc_name = self._proc_name(name)
-        for cb in self._output_callbacks:
-            try:
-                cb(proc_name, line)
-            except Exception:
-                pass
-
-    def _notify_user(self, title: str, message: str) -> None:
-        for cb in self._notify_callbacks:
-            try:
-                cb(title, message)
-            except Exception:
-                pass
-
-    def _read_output(self, pipe, name: str) -> None:
-        """Read lines from a process pipe in a dedicated thread."""
-        proc_logger = self._get_logger(name)
+    def _reader(self, pipe, q: queue.Queue, name: str) -> None:
+        proc_logger = (
+            get_napcat_logger() if name == "napcat" else get_astrbot_logger()
+        )
         try:
             for line in iter(pipe.readline, ""):
-                if not line:
-                    break
                 line = line.rstrip("\n\r")
                 if line:
                     proc_logger.info(line)
-                    self._notify_output(name, line)
+                    q.put(line)
         except (ValueError, IOError):
             pass
-        finally:
-            try:
-                pipe.close()
-            except Exception:
-                pass
 
-    def _start_process(self, name: str) -> None:
+    def _start(self, name: str) -> None:
         logger = get_main_logger()
-        proc_name = self._proc_name(name)
-
-        if self._is_running(name):
-            logger.info("%s is already running", proc_name)
+        pname = self._name(name)
+        if self._running(name):
             return
+        cfg = self._config[name]
+        cwd: str = cfg["cwd"]
+        cmd: str = cfg["cmd"]
+        enc: str = cfg.get("encoding", "utf-8")
 
-        proc_config = self._proc_config(name)
-        cwd = proc_config["cwd"]
-        cmd = proc_config["cmd"]
-
-        # Clean up stale lock files before starting (e.g. astrbot.lock)
-        lock_file = os.path.join(cwd, "astrbot.lock")
-        if name == "astrbot" and os.path.exists(lock_file):
-            try:
-                os.remove(lock_file)
-                logger.info("Removed stale lock file: %s", lock_file)
-            except OSError:
-                pass
+        # Clean stale lock files
+        if name == "astrbot":
+            lock = os.path.join(cwd, "astrbot.lock")
+            if os.path.exists(lock):
+                try:
+                    os.remove(lock)
+                except OSError:
+                    pass
 
         if not os.path.exists(cwd):
-            err_msg = f"{proc_name}: working directory not found: {cwd}"
-            logger.error(err_msg)
-            self._notify_output(name, f"[ERROR] Working directory not found: {cwd}")
-            self._notify_user("Startup Error", err_msg)
+            logger.error("%s cwd not found: %s", pname, cwd)
             return
 
-        logger.info("Starting %s: cwd=%s cmd=%s", proc_name, cwd, cmd)
+        args = shlex.split(cmd)
+        if (
+            not os.path.isabs(args[0])
+            and os.sep not in args[0]
+            and "/" not in args[0]
+        ):
+            resolved = os.path.join(cwd, args[0])
+            if os.path.exists(resolved):
+                args[0] = resolved
 
+        logger.info("Starting %s: %s", pname, args)
         try:
-            args = shlex.split(cmd)
-
-            # Resolve executable relative to cwd if it's a bare filename
-            exe_path = args[0]
-            if not os.path.isabs(exe_path) and os.sep not in exe_path and '/' not in exe_path:
-                resolved = os.path.join(cwd, exe_path)
-                if os.path.exists(resolved):
-                    args[0] = resolved
-
-            # Determine encoding from config
-            proc_encoding = proc_config.get("encoding", "utf-8")
-
-            # Build Popen kwargs
-            popen_kwargs: dict = {
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
+            kwargs: dict = {
                 "cwd": cwd,
                 "stdout": subprocess.PIPE,
                 "stderr": subprocess.STDOUT,
                 "stdin": subprocess.DEVNULL,
                 "text": True,
-                "encoding": proc_encoding,
+                "encoding": enc,
                 "errors": "replace",
+                "env": env,
             }
-            # Force Python subprocesses to use UTF-8 for stdout
-            env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "utf-8"
-            popen_kwargs["env"] = env
             if sys.platform == "win32":
-                popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-
-            proc = subprocess.Popen(args, **popen_kwargs)
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            proc = subprocess.Popen(args, **kwargs)
             self._set_proc(name, proc)
-            self._set_restart_count(name, 0)
-
-            # Start output reader thread
-            reader = threading.Thread(
-                target=self._read_output,
-                args=(proc.stdout, name),
+            self._reset_restart(name)
+            q = self._napcat_queue if name == "napcat" else self._astrbot_queue
+            threading.Thread(
+                target=self._reader,
+                args=(proc.stdout, q, name),
                 daemon=True,
-            )
-            reader.start()
-
-            logger.info("%s started (PID: %d)", proc_name, proc.pid)
-            self._notify_output(name, f"[SYSTEM] {proc_name} started (PID: {proc.pid})")
-            self._notify_status()
-
-            # Start monitor if not already running
-            self.start_monitor()
-
-        except FileNotFoundError:
-            err_msg = f"{proc_name}: executable not found: {cmd}"
-            logger.error(err_msg)
-            self._notify_output(name, f"[ERROR] Executable not found: {cmd}")
-            self._notify_user("Startup Error", err_msg)
+            ).start()
+            logger.info("%s started PID=%d", pname, proc.pid)
         except Exception as e:
-            err_msg = f"{proc_name}: failed to start: {e}"
-            logger.error(err_msg)
-            self._notify_output(name, f"[ERROR] Failed to start: {e}")
-            self._notify_user("Startup Error", err_msg)
+            logger.error("Failed to start %s: %s", pname, e)
+        self._emit_status()
 
-    def _stop_process(self, name: str) -> None:
+    def _stop(self, name: str) -> None:
         logger = get_main_logger()
-        proc_name = self._proc_name(name)
+        pname = self._name(name)
         proc = self._get_proc(name)
-
         if proc is None:
-            logger.info("%s is not running", proc_name)
             return
-
         pid = proc.pid
-        logger.info("Stopping %s (PID: %d)...", proc_name, pid)
-        self._manual_stop.add(name)  # Mark as manual stop (no crash notification)
-
-        # Step 1: Terminate the process FIRST (this closes write pipe, unblocks reader)
+        logger.info("Stopping %s PID=%d", pname, pid)
+        # Prevent auto-restart
+        setattr(self, self._restart_attr(name), self._max_restarts)
         try:
             proc.terminate()
         except Exception:
             pass
-
-        # Step 2: Wait for graceful exit
-        exited = False
         try:
             proc.wait(timeout=3)
-            exited = True
-            logger.info("%s stopped gracefully", proc_name)
+            logger.info("%s stopped gracefully", pname)
         except subprocess.TimeoutExpired:
-            pass
-        except Exception:
-            pass
-
-        # Step 3: Force kill if still running
-        if not exited:
+            logger.warning("%s not responding, killing", pname)
             try:
                 proc.kill()
                 proc.wait(timeout=2)
             except Exception:
                 pass
-
-        # Step 4: Close our end of the pipe (reader should already be done)
-        try:
-            if proc.stdout:
-                proc.stdout.close()
-        except Exception:
-            pass
-
-        # Step 5: Kill entire process tree as final cleanup
-        if sys.platform == "win32":
-            try:
-                subprocess.run(
-                    ["taskkill", "/f", "/t", "/pid", str(pid)],
-                    capture_output=True,
-                    timeout=5,
-                )
-            except Exception:
-                pass
-
         self._set_proc(name, None)
-        self._notify_output(name, f"[SYSTEM] {proc_name} stopped")
-        logger.info("%s stop completed", proc_name)
-        self._notify_status()
-
-    def _monitor_loop(self) -> None:
-        """Background thread: poll process status every 2 seconds."""
-        logger = get_main_logger()
-        while self._monitor_running:
-            for name in ("napcat", "astrbot"):
-                proc = self._get_proc(name)
-                if proc is None:
-                    continue
-
-                ret = proc.poll()
-                if ret is not None:
-                    proc_name = self._proc_name(name)
-
-                    # Manual stop: just clean up quietly
-                    if name in self._manual_stop:
-                        self._manual_stop.discard(name)
-                        logger.info("%s exited (manual stop)", proc_name)
-                        self._notify_output(name, f"[SYSTEM] {proc_name} stopped")
-                        self._set_proc(name, None)
-                        self._notify_status()
-                        continue
-
-                    # Crash: handle auto-restart
-                    count = self._get_restart_count(name)
-                    logger.warning(
-                        "%s exited with code %d (restart count: %d/%d)",
-                        proc_name, ret, count, self._max_restarts,
-                    )
-                    self._notify_output(
-                        name,
-                        f"[SYSTEM] {proc_name} exited with code {ret}",
-                    )
-                    self._set_proc(name, None)
-                    self._notify_status()
-
-                    if count < self._max_restarts:
-                        self._set_restart_count(name, count + 1)
-                        logger.info("Auto-restarting %s...", proc_name)
-                        msg = f"Auto-restarting {proc_name} ({count + 1}/{self._max_restarts})..."
-                        self._notify_output(name, f"[SYSTEM] {msg}")
-                        self._notify_user(
-                            f"{proc_name} Crashed",
-                            f"Auto-restarting ({count + 1}/{self._max_restarts})..."
-                        )
-                        self._start_process(name)
-                    else:
-                        logger.error(
-                            "%s: max restarts (%d) reached, giving up",
-                            proc_name, self._max_restarts,
-                        )
-                        msg = f"{proc_name}: max restarts reached, giving up"
-                        self._notify_output(name, f"[SYSTEM] {msg}")
-                        self._notify_user(
-                            f"{proc_name} Stopped",
-                            "Max restart attempts reached. Please check logs."
-                        )
-
-            time.sleep(2)
-
-    def shutdown(self) -> None:
-        """Stop all processes and monitor. Forces exit if timeout."""
-        logger = get_main_logger()
-        logger.info("Shutting down...")
-        self.stop_monitor()
-
-        # Run stop_all in a thread with a hard timeout
-        stopped = threading.Event()
-
-        def _do_stop():
-            try:
-                self.stop_all()
-            except Exception:
-                pass
-            stopped.set()
-
-        t = threading.Thread(target=_do_stop, daemon=True)
-        t.start()
-        if not stopped.wait(timeout=15):
-            logger.error("Shutdown timed out after 15s!")
-        else:
-            logger.info("Shutdown complete")
+        self._emit_status()
