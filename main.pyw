@@ -120,8 +120,15 @@ def main() -> None:
         window.destroy()
     except Exception:
         pass
-    time.sleep(0.5)
+    # Flush and close all log handlers so files are released
+    for name in ("airobotui.main", "airobotui.napcat", "airobotui.astrbot"):
+        import logging
+        lg = logging.getLogger(name)
+        for h in lg.handlers:
+            h.flush()
+            h.close()
     logger.info("AIRobotUI exited")
+    os._exit(0)  # Immediate exit - avoids PyInstaller tmp cleanup race
 
 
 if __name__ == "__main__":
