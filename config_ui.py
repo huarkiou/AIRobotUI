@@ -1,4 +1,4 @@
-"""Configuration dialog for AIRobotUI."""
+"""Configuration dialog for AIRobotUI - uses own Tk root to avoid withdrawn-parent issue."""
 
 import os
 import tkinter as tk
@@ -9,17 +9,15 @@ from logger import get_main_logger
 
 
 class ConfigDialog:
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self) -> None:
         self._logger = get_main_logger()
         self._result: dict | None = None
 
-        self.dialog = tk.Toplevel(root)
+        # Own Tk root - independent of hidden main window
+        self.dialog = tk.Tk()
         self.dialog.title("AIRobotUI - Settings")
         self.dialog.geometry("550x380")
         self.dialog.resizable(False, False)
-        self.dialog.transient(root)
-        self.dialog.deiconify()  # Force show (parent may be withdrawn)
-        self.dialog.focus_force()
 
         # Prevent closing if no config exists (first run)
         self._blocking = load_config() is None
@@ -187,7 +185,6 @@ class ConfigDialog:
         if save_config(config):
             self._logger.info("Config saved via settings dialog")
 
-            # Handle autostart
             if config["autostart"]:
                 enable_autostart()
             else:
@@ -206,5 +203,5 @@ class ConfigDialog:
 
     def get_result(self) -> dict | None:
         """Wait for dialog and return config dict, or None if cancelled."""
-        self.dialog.wait_window()
+        self.dialog.mainloop()
         return self._result
