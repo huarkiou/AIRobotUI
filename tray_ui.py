@@ -1,5 +1,6 @@
 """System tray icon and menu for AIRobotUI."""
 
+import threading
 import pystray
 from pystray import Menu, MenuItem
 from icon import get_green_icon, get_yellow_icon, get_red_icon
@@ -115,17 +116,17 @@ class TrayUI:
         self._pm.stop_all()
 
     def _on_show_window(self, icon, item) -> None:
-        self._window.show()
+        self._window.root.after(0, self._window.show)
 
     def _on_settings(self, icon, item) -> None:
         if self._config_callback:
-            self._config_callback()
+            self._window.root.after(0, self._config_callback)
 
     def _on_exit(self, icon, item) -> None:
         self._logger.info("Exit requested from tray menu")
         self._pm.shutdown()
-        self._window.destroy()
-        self._icon.stop()
+        self._icon.stop()  # Stop pystray (running in this thread)
+        self._window.root.after(0, self._window.destroy)  # Destroy tkinter on main thread
 
     def _on_notification(self, title: str, message: str) -> None:
         """Handle notification from process manager."""
@@ -137,9 +138,12 @@ class TrayUI:
     # --- Lifecycle ---
 
     def run(self) -> None:
-        """Start the tray icon event loop (blocking)."""
-        self._logger.info("Starting tray icon")
-        self._icon.run()
+        """Start the tray icon in a background daemon thread (non-blocking)."""
+        self._logger.info("Starting tray icon in background thread")
+        tray_thread = threading.Thread(
+            target=self._icon.run, daemon=True, name="tray-icon"
+        )
+        tray_thread.start()
 
     def stop(self) -> None:
         """Stop the tray icon."""

@@ -1,6 +1,7 @@
 """Process manager for NapCat QQ and AstrBot - lifecycle, monitoring, output capture."""
 
 import subprocess
+import sys
 import threading
 import time
 import shlex
@@ -192,17 +193,26 @@ class ProcessManager:
             else:
                 args = shlex.split(cmd)
 
-            proc = subprocess.Popen(
-                args,
-                cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL,
-                shell=use_shell,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
+            # Build Popen kwargs to hide console window on Windows
+            popen_kwargs: dict = {
+                "cwd": cwd,
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.STDOUT,
+                "stdin": subprocess.DEVNULL,
+                "shell": use_shell,
+                "text": True,
+                "encoding": "utf-8",
+                "errors": "replace",
+            }
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+                # Also hide via STARTUPINFO for shell=True
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+                popen_kwargs["startupinfo"] = startupinfo
+
+            proc = subprocess.Popen(args, **popen_kwargs)
             self._set_proc(name, proc)
             self._set_restart_count(name, 0)
 

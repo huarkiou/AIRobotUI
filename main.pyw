@@ -23,30 +23,24 @@ def main() -> None:
     window = MainWindow()
 
     # Step 2: Load or create config
-    config = load_config()
-    if config is None:
-        logger.info("No config found, saving defaults...")
+    is_first = load_config() is None
+    if is_first:
+        logger.info("No config found, using defaults")
         config = get_default_config()
         save_config(config)
+    else:
+        config = load_config()
 
-    # Step 3: Show config dialog on first run (blocking)
-    if config is None or _is_first_run():
-        logger.info("Showing first-run settings dialog...")
-        dialog = ConfigDialog(window.root)
-        result = dialog.get_result()
-        if result is not None:
-            config = result
-
-    # Step 4: Initialize process manager
+    # Step 3: Initialize process manager
     pm = ProcessManager(config)
 
-    # Step 5: Wire output to main window
+    # Step 4: Wire output to main window
     pm.on_output(window.append_output)
 
-    # Step 6: Create tray UI
+    # Step 5: Create tray UI
     tray = TrayUI(pm, window, config)
 
-    # Step 7: Settings callback
+    # Step 6: Settings callback (thread-safe via root.after)
     def open_settings() -> None:
         logger.info("Opening settings dialog")
         dialog = ConfigDialog(window.root)
@@ -57,17 +51,20 @@ def main() -> None:
 
     tray.set_config_callback(open_settings)
 
-    # Step 8: Start tray (blocking)
-    logger.info("Entering tray event loop")
+    # Step 7: First-run: show config dialog after mainloop starts
+    if is_first:
+        logger.info("Scheduling first-run settings dialog...")
+        window.root.after(300, open_settings)
+
+    # Step 8: Start tray in background thread (non-blocking)
+    logger.info("Starting tray in background thread...")
     tray.run()
 
+    # Step 9: Run tkinter mainloop in main thread
+    logger.info("Entering tkinter main loop")
+    window.root.mainloop()
+
     logger.info("AIRobotUI exited")
-
-
-def _is_first_run() -> bool:
-    """Check if this is the first run (based on config existence)."""
-    from config import load_config
-    return load_config() is None
 
 
 if __name__ == "__main__":

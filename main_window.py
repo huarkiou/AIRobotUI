@@ -32,6 +32,9 @@ class MainWindow:
         self._close_callback: callable | None = None
         self._logger = get_main_logger()
 
+        # Start hidden (show only when user requests)
+        self.root.withdraw()
+
     def _create_text_widget(self, parent: ttk.Frame) -> tk.Text:
         """Create a terminal-style read-only text widget."""
         frame = tk.Frame(parent, bg="black")
