@@ -69,10 +69,13 @@ class MainWindow:
         scrollbar.config(command=text.yview)
 
         # Clear button at bottom
+        btn_frame = tk.Frame(frame, height=30)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        btn_frame.pack_propagate(False)
         tk.Button(
-            frame, text="Clear",
+            btn_frame, text="Clear",
             command=lambda t=text: self._clear_tab(t),
-        ).pack(side=tk.BOTTOM, pady=(2, 0))
+        ).pack(fill=tk.BOTH, expand=True, padx=4, pady=2)
 
         # Right-click context menu
         context_menu = tk.Menu(text, tearoff=0)
