@@ -110,21 +110,12 @@ class MainWindow:
         self._visible = False
 
     def toggle(self) -> None:
-        """Toggle window visibility. If visible but not focused, bring to front."""
+        """Toggle window visibility. If visible, flash to front then hide as cue."""
         if self._visible:
-            # Check if our window currently has keyboard focus
-            try:
-                focused = self.root.focus_get()
-            except Exception:
-                focused = None
-            if focused is None:
-                # Not focused - bring to front instead of hiding
-                self.root.deiconify()
-                self.root.lift()
-                self.root.focus_force()
-                self._logger.info("Main window brought to front")
-            else:
-                self.hide()
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
+            self.root.after(150, self.hide)
         else:
             self.show()
 
