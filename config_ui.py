@@ -1,4 +1,4 @@
-"""Configuration dialog for AIRobotUI - uses own Tk root to avoid withdrawn-parent issue."""
+"""Configuration dialog for AIRobotUI."""
 
 import os
 import tkinter as tk
@@ -9,15 +9,27 @@ from logger import get_main_logger
 
 
 class ConfigDialog:
-    def __init__(self) -> None:
+    def __init__(self, root: tk.Tk) -> None:
         self._logger = get_main_logger()
         self._result: dict | None = None
 
-        # Own Tk root - independent of hidden main window
-        self.dialog = tk.Tk()
+        # Make parent transparently viewable so grab_set works, without flashing
+        parent_was_hidden = not root.winfo_viewable()
+        if parent_was_hidden:
+            root.attributes("-alpha", 0)
+            root.deiconify()
+
+        self.dialog = tk.Toplevel(root)
         self.dialog.title("AIRobotUI - Settings")
         self.dialog.geometry("550x380")
         self.dialog.resizable(False, False)
+        self.dialog.transient(root)
+        self.dialog.grab_set()
+
+        # Re-hide parent immediately (dialog stays visible with its own mapping)
+        if parent_was_hidden:
+            root.withdraw()
+            root.attributes("-alpha", 1)
 
         # Prevent closing if no config exists (first run)
         self._blocking = load_config() is None
@@ -203,5 +215,5 @@ class ConfigDialog:
 
     def get_result(self) -> dict | None:
         """Wait for dialog and return config dict, or None if cancelled."""
-        self.dialog.mainloop()
+        self.dialog.wait_window()
         return self._result

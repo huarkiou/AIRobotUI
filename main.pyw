@@ -48,7 +48,7 @@ def main() -> None:
         _settings_open = True
         logger.info("Opening settings dialog")
         try:
-            dlg = ConfigDialog()
+            dlg = ConfigDialog(window.root)
             result = dlg.get_result()
             if result is not None:
                 pm.update_config(result)
