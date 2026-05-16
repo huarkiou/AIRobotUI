@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import locale
 import threading
 import time
 import shlex
@@ -193,6 +194,9 @@ class ProcessManager:
             else:
                 args = shlex.split(cmd)
 
+            # Determine encoding from config, fall back to system locale
+            proc_encoding = proc_config.get("encoding") or locale.getpreferredencoding() or "utf-8"
+
             # Build Popen kwargs to hide console window on Windows
             popen_kwargs: dict = {
                 "cwd": cwd,
@@ -201,7 +205,7 @@ class ProcessManager:
                 "stdin": subprocess.DEVNULL,
                 "shell": use_shell,
                 "text": True,
-                "encoding": "utf-8",
+                "encoding": proc_encoding,
                 "errors": "replace",
             }
             if sys.platform == "win32":

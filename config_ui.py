@@ -15,7 +15,7 @@ class ConfigDialog:
 
         self.dialog = tk.Toplevel(root)
         self.dialog.title("AIRobotUI - Settings")
-        self.dialog.geometry("550x320")
+        self.dialog.geometry("550x380")
         self.dialog.resizable(False, False)
         self.dialog.transient(root)
         self.dialog.grab_set()
@@ -56,6 +56,17 @@ class ConfigDialog:
             row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0)
         )
 
+        ttk.Label(napcat_frame, text="Encoding:").grid(
+            row=2, column=0, sticky=tk.W, pady=2
+        )
+        self.napcat_enc = tk.StringVar(value="utf-8")
+        enc_combo_n = ttk.Combobox(
+            napcat_frame, textvariable=self.napcat_enc,
+            values=["utf-8", "gbk", "gb2312", "cp936", "shift_jis", "latin-1"],
+            width=15, state="readonly",
+        )
+        enc_combo_n.grid(row=2, column=1, sticky=tk.W, padx=(5, 0))
+
         napcat_frame.columnconfigure(1, weight=1)
 
         # --- AstrBot ---
@@ -81,6 +92,17 @@ class ConfigDialog:
         ttk.Entry(astrbot_frame, textvariable=self.astrbot_cmd, width=40).grid(
             row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0)
         )
+
+        ttk.Label(astrbot_frame, text="Encoding:").grid(
+            row=2, column=0, sticky=tk.W, pady=2
+        )
+        self.astrbot_enc = tk.StringVar(value="utf-8")
+        enc_combo_a = ttk.Combobox(
+            astrbot_frame, textvariable=self.astrbot_enc,
+            values=["utf-8", "gbk", "gb2312", "cp936", "shift_jis", "latin-1"],
+            width=15, state="readonly",
+        )
+        enc_combo_a.grid(row=2, column=1, sticky=tk.W, padx=(5, 0))
 
         astrbot_frame.columnconfigure(1, weight=1)
 
@@ -117,8 +139,10 @@ class ConfigDialog:
 
         self.napcat_cwd.set(config["napcat"]["cwd"])
         self.napcat_cmd.set(config["napcat"]["cmd"])
+        self.napcat_enc.set(config["napcat"].get("encoding", "utf-8"))
         self.astrbot_cwd.set(config["astrbot"]["cwd"])
         self.astrbot_cmd.set(config["astrbot"]["cmd"])
+        self.astrbot_enc.set(config["astrbot"].get("encoding", "gbk"))
         self.autostart_var.set(is_autostart_enabled())
 
     def _validate(self) -> str | None:
@@ -147,10 +171,12 @@ class ConfigDialog:
             "napcat": {
                 "cwd": self.napcat_cwd.get().strip(),
                 "cmd": self.napcat_cmd.get().strip(),
+                "encoding": self.napcat_enc.get().strip(),
             },
             "astrbot": {
                 "cwd": self.astrbot_cwd.get().strip(),
                 "cmd": self.astrbot_cmd.get().strip(),
+                "encoding": self.astrbot_enc.get().strip(),
             },
             "autostart": self.autostart_var.get(),
         }

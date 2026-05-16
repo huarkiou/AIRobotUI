@@ -19,14 +19,18 @@ def _get_config_path() -> str:
 
 def get_default_config() -> dict:
     """Return default configuration."""
+    import locale
+    sys_enc = locale.getpreferredencoding() or "utf-8"
     return {
         "napcat": {
             "cwd": "D:\\Apps\\ai\\napcatqq\\NapCat.44498.Shell",
             "cmd": "napcat.quick.bat",
+            "encoding": "utf-8",
         },
         "astrbot": {
             "cwd": "D:\\Apps\\ai\\astrbot",
             "cmd": "astrbot run",
+            "encoding": sys_enc,
         },
         "autostart": False,
     }

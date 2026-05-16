@@ -40,14 +40,24 @@ def main() -> None:
     # Step 5: Create tray UI
     tray = TrayUI(pm, window, config)
 
-    # Step 6: Settings callback (thread-safe via root.after)
+    # Step 6: Settings callback (thread-safe via root.after, guarded against re-entry)
+    _settings_open = False
+
     def open_settings() -> None:
+        nonlocal _settings_open
+        if _settings_open:
+            logger.info("Settings dialog already open, ignoring")
+            return
+        _settings_open = True
         logger.info("Opening settings dialog")
-        dialog = ConfigDialog(window.root)
-        result = dialog.get_result()
-        if result is not None:
-            pm.update_config(result)
-            logger.info("Config updated at runtime")
+        try:
+            dialog = ConfigDialog(window.root)
+            result = dialog.get_result()
+            if result is not None:
+                pm.update_config(result)
+                logger.info("Config updated at runtime")
+        finally:
+            _settings_open = False
 
     tray.set_config_callback(open_settings)
 
