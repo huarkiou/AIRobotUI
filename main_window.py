@@ -14,6 +14,14 @@ class MainWindow:
         self.root.geometry("800x500")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        # Center on screen
+        self.root.update_idletasks()
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        x = (sw - 800) // 2
+        y = (sh - 500) // 2
+        self.root.geometry(f"800x500+{x}+{y}")
+
         # Notebook (tabs)
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True)

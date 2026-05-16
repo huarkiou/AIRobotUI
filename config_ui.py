@@ -20,6 +20,16 @@ class ConfigDialog:
         self.dialog.resizable(False, False)
         self.dialog.transient(root)
 
+        # Center relative to parent
+        self.dialog.update_idletasks()
+        px = root.winfo_x()
+        py = root.winfo_y()
+        pw = root.winfo_width()
+        ph = root.winfo_height()
+        dx = px + (pw - 550) // 2
+        dy = py + (ph - 420) // 2
+        self.dialog.geometry(f"550x420+{max(0, dx)}+{max(0, dy)}")
+
         # Show root briefly so grab_set works, then re-hide after dialog closes
         root_was_hidden = not root.winfo_viewable()
         if root_was_hidden:
