@@ -376,9 +376,24 @@ class ProcessManager:
             time.sleep(2)
 
     def shutdown(self) -> None:
-        """Stop all processes and monitor."""
+        """Stop all processes and monitor. Forces exit if timeout."""
         logger = get_main_logger()
         logger.info("Shutting down...")
         self.stop_monitor()
-        self.stop_all()
-        logger.info("Shutdown complete")
+
+        # Run stop_all in a thread with a hard timeout
+        stopped = threading.Event()
+
+        def _do_stop():
+            try:
+                self.stop_all()
+            except Exception:
+                pass
+            stopped.set()
+
+        t = threading.Thread(target=_do_stop, daemon=True)
+        t.start()
+        if not stopped.wait(timeout=15):
+            logger.error("Shutdown timed out after 15s!")
+        else:
+            logger.info("Shutdown complete")

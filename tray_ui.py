@@ -129,11 +129,15 @@ class TrayUI:
             self._window.root.after(0, self._config_callback)
 
     def _on_exit(self, icon, item) -> None:
-        """Exit: shutdown processes, destroy window, then stop tray icon."""
+        """Exit: stop tray icon immediately, then shutdown and destroy window."""
         self._logger.info("Exit requested from tray menu")
-        self._pm.shutdown()
-        self._window.root.after(0, self._window.destroy)
-        icon.stop()
+        icon.stop()  # Hide tray immediately (must be called from pystray thread)
+
+        def _finish():
+            self._pm.shutdown()  # Has internal 15s timeout
+            self._window.root.after(0, self._window.destroy)
+
+        threading.Thread(target=_finish, daemon=True, name="exit").start()
 
     def _on_notification(self, title: str, message: str) -> None:
         """Handle notification from process manager."""
