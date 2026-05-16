@@ -2,8 +2,6 @@
 
 import subprocess
 import sys
-import signal
-import locale
 import threading
 import time
 import shlex
@@ -197,23 +195,17 @@ class ProcessManager:
         logger.info("Starting %s: cwd=%s cmd=%s", proc_name, cwd, cmd)
 
         try:
-            # Use shell=True only for .bat files
-            use_shell = cmd.endswith(".bat") or cmd.endswith(".cmd")
-            if use_shell:
-                args = cmd
-            else:
-                args = shlex.split(cmd)
+            args = shlex.split(cmd)
 
-            # Determine encoding from config, fall back to system locale
-            proc_encoding = proc_config.get("encoding") or locale.getpreferredencoding() or "utf-8"
+            # Determine encoding from config
+            proc_encoding = proc_config.get("encoding", "utf-8")
 
-            # Build Popen kwargs to hide console window on Windows
+            # Build Popen kwargs
             popen_kwargs: dict = {
                 "cwd": cwd,
                 "stdout": subprocess.PIPE,
                 "stderr": subprocess.STDOUT,
                 "stdin": subprocess.DEVNULL,
-                "shell": use_shell,
                 "text": True,
                 "encoding": proc_encoding,
                 "errors": "replace",
@@ -223,14 +215,7 @@ class ProcessManager:
             env["PYTHONIOENCODING"] = "utf-8"
             popen_kwargs["env"] = env
             if sys.platform == "win32":
-                popen_kwargs["creationflags"] = (
-                    subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
-                )
-                # Also hide via STARTUPINFO for shell=True
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = subprocess.SW_HIDE
-                popen_kwargs["startupinfo"] = startupinfo
+                popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
             proc = subprocess.Popen(args, **popen_kwargs)
             self._set_proc(name, proc)
@@ -275,20 +260,16 @@ class ProcessManager:
         logger.info("Stopping %s (PID: %d)...", proc_name, pid)
         self._set_restart_count(name, self._max_restarts)
 
-        # Close stdout pipe first
+        # Close stdout pipe
         try:
             if proc.stdout:
                 proc.stdout.close()
         except Exception:
             pass
 
-        # Step 1: Graceful shutdown - send Ctrl+C / CTRL_BREAK_EVENT
+        # Step 1: Graceful shutdown
         try:
-            if sys.platform == "win32":
-                # CTRL_BREAK_EVENT to the process group we created
-                os.kill(pid, signal.CTRL_BREAK_EVENT)
-            else:
-                proc.terminate()
+            proc.terminate()
         except Exception:
             pass
 
@@ -299,7 +280,7 @@ class ProcessManager:
             exited = True
             logger.info("%s stopped gracefully", proc_name)
         except subprocess.TimeoutExpired:
-            logger.warning("%s did not stop gracefully, force killing", proc_name)
+            logger.warning("%s did not stop, force killing", proc_name)
         except Exception:
             pass
 
@@ -310,16 +291,6 @@ class ProcessManager:
                 proc.wait(timeout=2)
             except Exception:
                 pass
-            # On Windows, also clean up child process tree
-            if sys.platform == "win32":
-                try:
-                    subprocess.Popen(
-                        ["taskkill", "/f", "/t", "/pid", str(pid)],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                except Exception:
-                    pass
 
         self._set_proc(name, None)
         self._notify_output(name, f"[SYSTEM] {proc_name} stopped")

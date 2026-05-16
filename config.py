@@ -24,7 +24,7 @@ def get_default_config() -> dict:
     return {
         "napcat": {
             "cwd": "D:\\Apps\\ai\\napcatqq\\NapCat.44498.Shell",
-            "cmd": "napcat.quick.bat",
+            "cmd": "NapCatWinBootMain.exe 2450085301",
             "encoding": "utf-8",
         },
         "astrbot": {
