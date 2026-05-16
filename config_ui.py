@@ -16,7 +16,7 @@ class ConfigDialog:
 
         self.dialog = tk.Toplevel(root)
         self.dialog.title("AIRobotUI - Settings")
-        self.dialog.geometry("550x380")
+        self.dialog.geometry("550x420")
         self.dialog.resizable(False, False)
         self.dialog.transient(root)
 
