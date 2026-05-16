@@ -89,6 +89,10 @@ class ProcessManager:
                 break
         return lines
 
+    def _system_msg(self, name: str, msg: str) -> None:
+        q = self._napcat_queue if name == "napcat" else self._astrbot_queue
+        q.put(f"[SYSTEM] {msg}")
+
     def _name(self, n: str) -> str:
         return "NapCat" if n == "napcat" else "AstrBot"
 
@@ -203,6 +207,7 @@ class ProcessManager:
                 daemon=True,
             ).start()
             logger.info("%s started PID=%d", pname, proc.pid)
+            self._system_msg(name, f"{pname} started (PID={proc.pid})")
         except Exception as e:
             logger.error("Failed to start %s: %s", pname, e)
         self._emit_status()
@@ -235,4 +240,5 @@ class ProcessManager:
                 except Exception:
                     pass
         self._set_proc(name, None)
+        self._system_msg(name, f"{pname} stopped")
         self._emit_status()

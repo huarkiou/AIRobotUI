@@ -44,18 +44,28 @@ class MainWindow:
         self.root.withdraw()
 
     def _create_text_widget(self, parent: ttk.Frame) -> tk.Text:
-        """Create a terminal-style read-only text widget."""
-        frame = tk.Frame(parent, bg="black")
+        """Create a read-only text widget with Clear button."""
+        frame = tk.Frame(parent)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        scrollbar = tk.Scrollbar(frame)
+        # Clear button
+        toolbar = tk.Frame(frame)
+        toolbar.pack(fill=tk.X)
+        clear_btn = tk.Button(toolbar, text="Clear", command=lambda t=text: self._clear_tab(t))
+        clear_btn.pack(side=tk.RIGHT, padx=2, pady=2)
+
+        # Text area
+        text_frame = tk.Frame(frame)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+
+        scrollbar = tk.Scrollbar(text_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         text = tk.Text(
-            frame,
-            bg="black",
-            fg="#00FF00",
-            insertbackground="#00FF00",
+            text_frame,
+            bg="white",
+            fg="black",
+            insertbackground="black",
             font=("Consolas", 10),
             wrap=tk.WORD,
             state=tk.DISABLED,
