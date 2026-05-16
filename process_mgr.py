@@ -258,6 +258,13 @@ class ProcessManager:
         logger.info("Stopping %s (PID: %d)...", proc_name, proc.pid)
         self._set_restart_count(name, self._max_restarts)  # Prevent auto-restart
 
+        # Close stdout pipe first to release any held file handles
+        try:
+            if proc.stdout:
+                proc.stdout.close()
+        except Exception:
+            pass
+
         try:
             proc.terminate()
         except Exception:
