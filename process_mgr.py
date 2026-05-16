@@ -267,7 +267,7 @@ class ProcessManager:
         except Exception:
             pass
 
-        # Step 1: Graceful shutdown
+        # Step 1: Graceful terminate
         try:
             proc.terminate()
         except Exception:
@@ -280,7 +280,7 @@ class ProcessManager:
             exited = True
             logger.info("%s stopped gracefully", proc_name)
         except subprocess.TimeoutExpired:
-            logger.warning("%s did not stop, force killing", proc_name)
+            pass
         except Exception:
             pass
 
@@ -289,6 +289,17 @@ class ProcessManager:
             try:
                 proc.kill()
                 proc.wait(timeout=2)
+            except Exception:
+                pass
+
+        # Step 4: Kill entire process tree (catches orphans from shims/wrappers)
+        if sys.platform == "win32":
+            try:
+                subprocess.run(
+                    ["taskkill", "/f", "/t", "/pid", str(pid)],
+                    capture_output=True,
+                    timeout=5,
+                )
             except Exception:
                 pass
 
