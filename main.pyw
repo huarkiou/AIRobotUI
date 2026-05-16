@@ -74,8 +74,11 @@ def main() -> None:
     def _poll_exit():
         if tray._exit_requested:
             logger.info("Exit requested, shutting down from main thread...")
-            pm.shutdown()
-            window.root.destroy()
+            try:
+                pm.shutdown()
+            except Exception as e:
+                logger.error("Shutdown error: %s", e)
+            window.root.quit()  # Safe exit from mainloop (don't destroy() inside after callback)
         else:
             window.root.after(500, _poll_exit)
 
@@ -84,6 +87,15 @@ def main() -> None:
     # Step 10: Run tkinter mainloop in main thread
     logger.info("Entering tkinter main loop")
     window.root.mainloop()
+
+    # Step 11: Cleanup after mainloop exits
+    logger.info("Mainloop exited, cleaning up...")
+    try:
+        window.destroy()
+    except Exception:
+        pass
+    import time
+    time.sleep(0.5)  # Let OS release file handles
 
     logger.info("AIRobotUI exited")
 
