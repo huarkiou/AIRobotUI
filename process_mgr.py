@@ -208,6 +208,10 @@ class ProcessManager:
                 "encoding": proc_encoding,
                 "errors": "replace",
             }
+            # Force Python subprocesses to use UTF-8 for stdout
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
+            popen_kwargs["env"] = env
             if sys.platform == "win32":
                 popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
                 # Also hide via STARTUPINFO for shell=True
@@ -255,7 +259,8 @@ class ProcessManager:
             logger.info("%s is not running", proc_name)
             return
 
-        logger.info("Stopping %s (PID: %d)...", proc_name, proc.pid)
+        pid = proc.pid
+        logger.info("Stopping %s (PID: %d)...", proc_name, pid)
         self._set_restart_count(name, self._max_restarts)  # Prevent auto-restart
 
         # Close stdout pipe first to release any held file handles
@@ -265,21 +270,32 @@ class ProcessManager:
         except Exception:
             pass
 
-        try:
-            proc.terminate()
-        except Exception:
-            pass
-
-        try:
-            proc.wait(timeout=3)
-            logger.info("%s stopped gracefully", proc_name)
-        except subprocess.TimeoutExpired:
-            logger.warning("%s did not stop, force killing", proc_name)
+        # On Windows, use taskkill /f /t for robust process tree killing
+        if sys.platform == "win32":
             try:
-                proc.kill()
-                proc.wait(timeout=2)
+                subprocess.run(
+                    ["taskkill", "/f", "/t", "/pid", str(pid)],
+                    capture_output=True,
+                    timeout=5,
+                )
+                logger.info("%s killed via taskkill", proc_name)
+            except Exception as e:
+                logger.warning("taskkill failed for %s: %s", proc_name, e)
+        else:
+            try:
+                proc.terminate()
             except Exception:
                 pass
+            try:
+                proc.wait(timeout=3)
+                logger.info("%s stopped gracefully", proc_name)
+            except subprocess.TimeoutExpired:
+                logger.warning("%s did not stop, force killing", proc_name)
+                try:
+                    proc.kill()
+                    proc.wait(timeout=2)
+                except Exception:
+                    pass
 
         self._set_proc(name, None)
         self._notify_output(name, f"[SYSTEM] {proc_name} stopped")

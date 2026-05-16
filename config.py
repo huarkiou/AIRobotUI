@@ -30,7 +30,7 @@ def get_default_config() -> dict:
         "astrbot": {
             "cwd": "D:\\Apps\\ai\\astrbot",
             "cmd": "astrbot run",
-            "encoding": sys_enc,
+            "encoding": "utf-8",
         },
         "autostart": False,
     }
