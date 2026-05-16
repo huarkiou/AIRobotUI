@@ -48,12 +48,6 @@ class MainWindow:
         frame = tk.Frame(parent)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        # Clear button
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill=tk.X)
-        clear_btn = tk.Button(toolbar, text="Clear", command=lambda t=text: self._clear_tab(t))
-        clear_btn.pack(side=tk.RIGHT, padx=2, pady=2)
-
         # Text area
         text_frame = tk.Frame(frame)
         text_frame.pack(fill=tk.BOTH, expand=True)
@@ -73,6 +67,14 @@ class MainWindow:
         )
         text.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=text.yview)
+
+        # Clear button (created after text so closure captures it)
+        toolbar = tk.Frame(frame)
+        toolbar.pack(fill=tk.X, before=text_frame)
+        tk.Button(
+            toolbar, text="Clear",
+            command=lambda t=text: self._clear_tab(t),
+        ).pack(side=tk.RIGHT, padx=2, pady=2)
 
         # Right-click context menu
         context_menu = tk.Menu(text, tearoff=0)
