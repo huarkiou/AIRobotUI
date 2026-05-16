@@ -60,11 +60,13 @@ def main() -> None:
 
     # --- Main event tick (runs on tkinter main thread) ---
     POLL_INTERVAL_MS = 2000
-    OUTPUT_INTERVAL_MS = 1000
     _last_poll = 0
     _last_output = 0
     _napcat_buf: list[str] = []
     _astrbot_buf: list[str] = []
+
+    def _output_interval() -> int:
+        return config.get("output_refresh_ms", 500)
 
     def _tick() -> None:
         nonlocal _last_poll, _last_output
@@ -90,9 +92,9 @@ def main() -> None:
         _napcat_buf.extend(pm.drain_napcat())
         _astrbot_buf.extend(pm.drain_astrbot())
 
-        # 3. Flush buffers to window at most once per second
+        # 3. Flush buffers to window at configured interval
         now = time.monotonic() * 1000
-        if now - _last_output >= OUTPUT_INTERVAL_MS:
+        if now - _last_output >= _output_interval():
             _last_output = now
             for line in _napcat_buf:
                 window.append_output("NapCat", line)

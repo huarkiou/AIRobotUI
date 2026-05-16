@@ -119,13 +119,26 @@ class ConfigDialog:
 
         # --- Autostart ---
         autostart_frame = ttk.Frame(main_frame)
-        autostart_frame.pack(fill=tk.X, pady=(0, 10))
+        autostart_frame.pack(fill=tk.X, pady=(0, 5))
         self.autostart_var = tk.BooleanVar()
         ttk.Checkbutton(
             autostart_frame,
             text="Start with Windows (autostart)",
             variable=self.autostart_var,
         ).pack(anchor=tk.W)
+
+        # --- Output refresh ---
+        output_frame = ttk.Frame(main_frame)
+        output_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(output_frame, text="Output refresh interval (ms):").pack(side=tk.LEFT)
+        self.output_refresh_var = tk.StringVar(value="500")
+        ttk.Spinbox(
+            output_frame, textvariable=self.output_refresh_var,
+            from_=100, to=5000, increment=100, width=6,
+        ).pack(side=tk.LEFT, padx=(5, 0))
+        ttk.Label(output_frame, text="(lower = smoother, higher = less CPU)").pack(
+            side=tk.LEFT, padx=(5, 0)
+        )
 
         # --- Buttons ---
         btn_frame = ttk.Frame(main_frame)
@@ -155,6 +168,7 @@ class ConfigDialog:
         self.astrbot_cmd.set(config["astrbot"]["cmd"])
         self.astrbot_enc.set(config["astrbot"].get("encoding", "gbk"))
         self.autostart_var.set(is_autostart_enabled())
+        self.output_refresh_var.set(str(config.get("output_refresh_ms", 500)))
 
     def _validate(self) -> str | None:
         """Validate inputs. Returns error string or None if valid."""
@@ -195,6 +209,7 @@ class ConfigDialog:
                 "cmd": self.astrbot_cmd.get().strip(),
                 "encoding": self.astrbot_enc.get().strip(),
             },
+            "output_refresh_ms": int(self.output_refresh_var.get()),
             "autostart": self.autostart_var.get(),
         }
 

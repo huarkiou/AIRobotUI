@@ -32,6 +32,7 @@ def get_default_config() -> dict:
             "cmd": "astrbot run",
             "encoding": "utf-8",
         },
+        "output_refresh_ms": 500,
         "autostart": False,
     }
 
