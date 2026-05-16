@@ -33,6 +33,7 @@ class TrayUI:
         # Register callbacks
         self._pm.on_status_change(self._refresh_icon)
         self._pm.on_notification(self._on_notification)
+        self._exit_requested = False  # Flag for main thread to handle exit
 
     def set_config_callback(self, callback: callable) -> None:
         """Set callback to be called when settings dialog is opened."""
@@ -129,15 +130,10 @@ class TrayUI:
             self._window.root.after(0, self._config_callback)
 
     def _on_exit(self, icon, item) -> None:
-        """Exit: stop tray icon immediately, then shutdown and destroy window."""
+        """Exit: signal main thread to handle shutdown, then stop tray."""
         self._logger.info("Exit requested from tray menu")
-        icon.stop()  # Hide tray immediately (must be called from pystray thread)
-
-        def _finish():
-            self._pm.shutdown()  # Has internal 15s timeout
-            self._window.root.after(0, self._window.destroy)
-
-        threading.Thread(target=_finish, daemon=True, name="exit").start()
+        self._exit_requested = True
+        icon.stop()
 
     def _on_notification(self, title: str, message: str) -> None:
         """Handle notification from process manager."""

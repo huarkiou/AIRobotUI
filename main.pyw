@@ -70,7 +70,18 @@ def main() -> None:
     logger.info("Starting tray in background thread...")
     tray.run()
 
-    # Step 9: Run tkinter mainloop in main thread
+    # Step 9: Start exit poller on main thread (checks tray._exit_requested)
+    def _poll_exit():
+        if tray._exit_requested:
+            logger.info("Exit requested, shutting down from main thread...")
+            pm.shutdown()
+            window.root.destroy()
+        else:
+            window.root.after(500, _poll_exit)
+
+    window.root.after(500, _poll_exit)
+
+    # Step 10: Run tkinter mainloop in main thread
     logger.info("Entering tkinter main loop")
     window.root.mainloop()
 
