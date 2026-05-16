@@ -18,8 +18,8 @@ class ConfigDialog:
         self.dialog.geometry("550x380")
         self.dialog.resizable(False, False)
         self.dialog.transient(root)
+        self.dialog.deiconify()  # Force show (parent may be withdrawn)
         self.dialog.focus_force()
-        self.dialog.lift()
 
         # Prevent closing if no config exists (first run)
         self._blocking = load_config() is None
