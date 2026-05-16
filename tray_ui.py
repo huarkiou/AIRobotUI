@@ -129,10 +129,15 @@ class TrayUI:
             self._window.root.after(0, self._config_callback)
 
     def _on_exit(self, icon, item) -> None:
+        """Exit - run shutdown in background, stop icon after."""
         self._logger.info("Exit requested from tray menu")
-        self._pm.shutdown()
-        self._icon.stop()  # Stop pystray (running in this thread)
-        self._window.root.after(0, self._window.destroy)  # Destroy tkinter on main thread
+
+        def _do_exit():
+            self._pm.shutdown()
+            self._icon.stop()
+            self._window.root.after(0, self._window.destroy)
+
+        threading.Thread(target=_do_exit, daemon=True, name="exit").start()
 
     def _on_notification(self, title: str, message: str) -> None:
         """Handle notification from process manager."""

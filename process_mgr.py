@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import signal
 import locale
 import threading
 import time
@@ -177,6 +178,15 @@ class ProcessManager:
         cwd = proc_config["cwd"]
         cmd = proc_config["cmd"]
 
+        # Clean up stale lock files before starting (e.g. astrbot.lock)
+        lock_file = os.path.join(cwd, "astrbot.lock")
+        if name == "astrbot" and os.path.exists(lock_file):
+            try:
+                os.remove(lock_file)
+                logger.info("Removed stale lock file: %s", lock_file)
+            except OSError:
+                pass
+
         if not os.path.exists(cwd):
             err_msg = f"{proc_name}: working directory not found: {cwd}"
             logger.error(err_msg)
@@ -213,7 +223,9 @@ class ProcessManager:
             env["PYTHONIOENCODING"] = "utf-8"
             popen_kwargs["env"] = env
             if sys.platform == "win32":
-                popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+                popen_kwargs["creationflags"] = (
+                    subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+                )
                 # Also hide via STARTUPINFO for shell=True
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -261,7 +273,7 @@ class ProcessManager:
 
         pid = proc.pid
         logger.info("Stopping %s (PID: %d)...", proc_name, pid)
-        self._set_restart_count(name, self._max_restarts)  # Prevent auto-restart
+        self._set_restart_count(name, self._max_restarts)
 
         # Close stdout pipe first
         try:
@@ -270,28 +282,48 @@ class ProcessManager:
         except Exception:
             pass
 
-        # Kill the process (non-blocking)
+        # Step 1: Graceful shutdown - send Ctrl+C / CTRL_BREAK_EVENT
         try:
-            proc.kill()
+            if sys.platform == "win32":
+                # CTRL_BREAK_EVENT to the process group we created
+                os.kill(pid, signal.CTRL_BREAK_EVENT)
+            else:
+                proc.terminate()
         except Exception:
             pass
 
-        # On Windows, also try taskkill to clean up child process tree
-        # Run as fire-and-forget (don't block waiting for it)
-        if sys.platform == "win32":
+        # Step 2: Wait for graceful exit
+        exited = False
+        try:
+            proc.wait(timeout=3)
+            exited = True
+            logger.info("%s stopped gracefully", proc_name)
+        except subprocess.TimeoutExpired:
+            logger.warning("%s did not stop gracefully, force killing", proc_name)
+        except Exception:
+            pass
+
+        # Step 3: Force kill if still running
+        if not exited:
             try:
-                subprocess.Popen(
-                    ["taskkill", "/f", "/t", "/pid", str(pid)],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
+                proc.kill()
+                proc.wait(timeout=2)
             except Exception:
                 pass
+            # On Windows, also clean up child process tree
+            if sys.platform == "win32":
+                try:
+                    subprocess.Popen(
+                        ["taskkill", "/f", "/t", "/pid", str(pid)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                except Exception:
+                    pass
 
-        # Mark as stopped immediately (don't wait for process to die)
         self._set_proc(name, None)
         self._notify_output(name, f"[SYSTEM] {proc_name} stopped")
-        logger.info("%s stop command sent", proc_name)
+        logger.info("%s stop completed", proc_name)
         self._notify_status()
 
     def _monitor_loop(self) -> None:
