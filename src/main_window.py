@@ -60,7 +60,7 @@ class MainWindow:
             bg="white",
             fg="black",
             insertbackground="black",
-            font=("Microsoft YaHei", 10),
+            font=("Segoe UI", 10),
             wrap=tk.WORD,
             state=tk.DISABLED,
             yscrollcommand=scrollbar.set,
