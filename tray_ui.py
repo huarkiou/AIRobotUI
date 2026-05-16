@@ -44,8 +44,8 @@ class TrayUI:
             MenuItem("Stop All", lambda i, _: self._enqueue("stop:all")),
             Menu.SEPARATOR,
             MenuItem(
-                "Show Window",
-                lambda i, _: self._window.root.after(0, self._window.show),
+                "Show/Hide Window",
+                lambda i, _: self._window.root.after(0, self._window.toggle),
             ),
             MenuItem("Settings", lambda i, _: self._cb_settings()),
             Menu.SEPARATOR,

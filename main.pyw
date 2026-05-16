@@ -60,10 +60,14 @@ def main() -> None:
 
     # --- Main event tick (runs on tkinter main thread) ---
     POLL_INTERVAL_MS = 2000
+    OUTPUT_INTERVAL_MS = 1000
     _last_poll = 0
+    _last_output = 0
+    _napcat_buf: list[str] = []
+    _astrbot_buf: list[str] = []
 
     def _tick() -> None:
-        nonlocal _last_poll
+        nonlocal _last_poll, _last_output
 
         # 1. Consume pending tray action
         action = tray.consume_action()
@@ -82,21 +86,34 @@ def main() -> None:
             elif action == "stop:astrbot":
                 pm.stop_astrbot()
 
-        # 2. Drain output to window
-        for line in pm.drain_napcat():
-            window.append_output("NapCat", line)
-        for line in pm.drain_astrbot():
-            window.append_output("AstrBot", line)
+        # 2. Drain output queues to buffers
+        _napcat_buf.extend(pm.drain_napcat())
+        _astrbot_buf.extend(pm.drain_astrbot())
 
-        # 3. Periodic crash poll
+        # 3. Flush buffers to window at most once per second
         now = time.monotonic() * 1000
+        if now - _last_output >= OUTPUT_INTERVAL_MS:
+            _last_output = now
+            for line in _napcat_buf:
+                window.append_output("NapCat", line)
+            for line in _astrbot_buf:
+                window.append_output("AstrBot", line)
+            _napcat_buf.clear()
+            _astrbot_buf.clear()
+
+        # 4. Periodic crash poll
         if now - _last_poll >= POLL_INTERVAL_MS:
             _last_poll = now
             pm.poll_crashes()
 
-        # 4. Exit check
+        # 5. Exit check
         if tray._exit_requested:
             logger.info("Exit: hiding window, shutting down...")
+            # Flush remaining output before exit
+            for line in _napcat_buf:
+                window.append_output("NapCat", line)
+            for line in _astrbot_buf:
+                window.append_output("AstrBot", line)
             window.hide()
             pm.shutdown()
             window.root.quit()
