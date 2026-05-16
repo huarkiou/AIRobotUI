@@ -29,6 +29,7 @@ class ProcessManager:
         self._output_callbacks: list[OutputCallback] = []
         self._status_callbacks: list[StatusCallback] = []
         self._notify_callbacks: list[NotifyCallback] = []
+        self._manual_stop: set[str] = set()  # Track manual stops vs crashes
 
     # --- Public API ---
 
@@ -265,7 +266,7 @@ class ProcessManager:
 
         pid = proc.pid
         logger.info("Stopping %s (PID: %d)...", proc_name, pid)
-        self._set_restart_count(name, self._max_restarts)
+        self._manual_stop.add(name)  # Mark as manual stop (no crash notification)
 
         # Step 1: Terminate the process FIRST (this closes write pipe, unblocks reader)
         try:
@@ -327,6 +328,17 @@ class ProcessManager:
                 ret = proc.poll()
                 if ret is not None:
                     proc_name = self._proc_name(name)
+
+                    # Manual stop: just clean up quietly
+                    if name in self._manual_stop:
+                        self._manual_stop.discard(name)
+                        logger.info("%s exited (manual stop)", proc_name)
+                        self._notify_output(name, f"[SYSTEM] {proc_name} stopped")
+                        self._set_proc(name, None)
+                        self._notify_status()
+                        continue
+
+                    # Crash: handle auto-restart
                     count = self._get_restart_count(name)
                     logger.warning(
                         "%s exited with code %d (restart count: %d/%d)",

@@ -129,15 +129,15 @@ class TrayUI:
             self._window.root.after(0, self._config_callback)
 
     def _on_exit(self, icon, item) -> None:
-        """Exit - run shutdown in background, stop icon after."""
+        """Exit: stop icon first (must be from pystray thread), then shutdown in background."""
         self._logger.info("Exit requested from tray menu")
+        icon.stop()  # Must be called from pystray thread
 
-        def _do_exit():
+        def _cleanup():
             self._pm.shutdown()
-            self._icon.stop()
             self._window.root.after(0, self._window.destroy)
 
-        threading.Thread(target=_do_exit, daemon=True, name="exit").start()
+        threading.Thread(target=_cleanup, daemon=True, name="exit-cleanup").start()
 
     def _on_notification(self, title: str, message: str) -> None:
         """Handle notification from process manager."""
