@@ -4,9 +4,13 @@ on:
   push:
     paths:
       - "**.py"
+      - "**.pyw"
+      - "**.pyi"
   pull_request:
     paths:
       - "**.py"
+      - "**.pyw"
+      - "**.pyi"
 
 jobs:
   format:
