@@ -295,12 +295,6 @@ class ProcessManager:
                     timeout=5,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
-                subprocess.run(
-                    ["taskkill", "/f", "/t", "/im", "QQ.exe"],
-                    capture_output=True,
-                    timeout=5,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
             self._system_msg(name, f"Killed existing {pname} process before starting")
 
         if not os.path.exists(cwd):
