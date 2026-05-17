@@ -31,6 +31,8 @@ class ProcessManager:
         self._astrbot_webui_url: str | None = None
         self._napcat_last_restart: float = 0.0
         self._astrbot_last_restart: float = 0.0
+        self._napcat_cooldown_notified: bool = False
+        self._astrbot_cooldown_notified: bool = False
 
     # --- Public API ---
 
@@ -111,17 +113,20 @@ class ProcessManager:
                 now = time.monotonic()
                 last = getattr(self, f"_{name}_last_restart")
                 if count > 0 and now - last < RESTART_COOLDOWN:
-                    remaining = int(RESTART_COOLDOWN - (now - last))
-                    self._system_msg(
-                        name,
-                        f"{pname} restart cooldown, next attempt in {remaining}s",
-                    )
+                    if not getattr(self, f"_{name}_cooldown_notified"):
+                        setattr(self, f"_{name}_cooldown_notified", True)
+                        remaining = int(RESTART_COOLDOWN - (now - last))
+                        self._system_msg(
+                            name,
+                            f"{pname} restart cooldown, next attempt in {remaining}s",
+                        )
                     continue
 
                 # Mark process as dead and execute restart
                 self._set_proc(name, None)
                 setattr(self, f"_{name}_webui_url", None)
                 self._inc_restart(name)
+                setattr(self, f"_{name}_cooldown_notified", False)
                 setattr(self, f"_{name}_last_restart", now)
                 self._system_msg(
                     name,
