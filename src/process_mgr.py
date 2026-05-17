@@ -7,7 +7,7 @@ import queue
 import shlex
 import os
 import re
-import time  # noqa: F401  (will be used in follow-up task)
+import time
 from datetime import datetime
 from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
 
@@ -221,8 +221,8 @@ class ProcessManager:
         if sys.platform == "win32":
             if name == "astrbot":
                 subprocess.run(
-                    ["taskkill", "/f", "/im", "astrbot.exe"],
-                    capture_output=True,
+                    ["taskkill", "/f", "/t", "/im", "astrbot.exe"],
+                    capture_output=True, timeout=5,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
                 lock = os.path.join(cwd, "astrbot.lock")
@@ -230,22 +230,23 @@ class ProcessManager:
                     try:
                         os.remove(lock)
                     except OSError:
-                        subprocess.run(
-                            ["cmd", "/c", "del", "/f", lock],
-                            capture_output=True,
-                            creationflags=subprocess.CREATE_NO_WINDOW,
-                        )
+                        time.sleep(0.5)
+                        try:
+                            os.remove(lock)
+                        except OSError:
+                            pass
             elif name == "napcat":
                 subprocess.run(
-                    ["taskkill", "/f", "/im", "QQ.exe"],
-                    capture_output=True,
+                    ["taskkill", "/f", "/t", "/im", "NapCatWinBootMain.exe"],
+                    capture_output=True, timeout=5,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
                 subprocess.run(
-                    ["taskkill", "/f", "/im", "NapCatWinBootMain.exe"],
-                    capture_output=True,
+                    ["taskkill", "/f", "/t", "/im", "QQ.exe"],
+                    capture_output=True, timeout=5,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
+            self._system_msg(name, f"Killed existing {pname} process before starting")
 
         if not os.path.exists(cwd):
             logger.error("%s cwd not found: %s", pname, cwd)
