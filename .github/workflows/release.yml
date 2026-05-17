@@ -2,12 +2,63 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number (e.g. 0.1.0)"
+        required: true
+        type: string
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          TAG="v${{ inputs.version }}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="HEAD"
+            SINCE="Initial release"
+          else
+            RANGE="$PREV_TAG..HEAD"
+            SINCE="$PREV_TAG"
+          fi
+
+          {
+            echo "## Changes since $SINCE"
+            echo ""
+
+            FEATS=$(git log $RANGE --no-merges --format="- %s (%h)" --grep="^feat" || true)
+            if [ -n "$FEATS" ]; then
+              echo "### Features"
+              echo "$FEATS"
+              echo ""
+            fi
+
+            FIXES=$(git log $RANGE --no-merges --format="- %s (%h)" --grep="^fix" || true)
+            if [ -n "$FIXES" ]; then
+              echo "### Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+
+            OTHER=$(git log $RANGE --no-merges --format="- %s (%h)" --perl-regexp --grep="^(chore|docs|ci|refactor|build)" || true)
+            if [ -n "$OTHER" ]; then
+              echo "### Other"
+              echo "$OTHER"
+              echo ""
+            fi
+          } > CHANGELOG.md
+
+          cat CHANGELOG.md
 
       - uses: astral-sh/setup-uv@v5
         with:
@@ -18,8 +69,9 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/AIRobotUI.exe
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
+          tag_name: ${{ steps.changelog.outputs.tag }}
+          name: AIRobotUI ${{ steps.changelog.outputs.tag }}
+          body_path: CHANGELOG.md
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
