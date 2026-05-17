@@ -23,12 +23,12 @@ def get_default_config() -> dict:
     sys_enc = locale.getpreferredencoding() or "utf-8"
     return {
         "napcat": {
-            "cwd": "D:\\Apps\\ai\\napcatqq\\NapCat.44498.Shell",
+            "cwd": "D:\\Apps\\ai\\AIRobotUI\\napcatqq\\NapCat.44498.Shell",
             "cmd": "NapCatWinBootMain.exe 2450085301",
             "encoding": "utf-8",
         },
         "astrbot": {
-            "cwd": "D:\\Apps\\ai\\astrbot",
+            "cwd": "D:\\Apps\\ai\\AIRobotUI\\astrbot",
             "cmd": "astrbot run",
             "encoding": "utf-8",
         },
