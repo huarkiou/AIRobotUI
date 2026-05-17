@@ -12,6 +12,9 @@ from datetime import datetime
 from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
 
 
+_STRIP_ANSI = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+
+
 class ProcessManager:
     def __init__(self, config: dict) -> None:
         self._config = config
@@ -100,6 +103,7 @@ class ProcessManager:
         q.put(f"[{ts}] [SYSTEM] {msg}")
 
     def _try_parse_webui_url(self, name: str, line: str) -> str | None:
+        line = _STRIP_ANSI.sub('', line)
         if name == "napcat":
             marker = "[WebUi] WebUi User Panel Url: "
             idx = line.find(marker)
@@ -171,6 +175,7 @@ class ProcessManager:
         try:
             for line in iter(pipe.readline, ""):
                 line = line.rstrip("\n\r")
+                line = _STRIP_ANSI.sub('', line)
                 if line:
                     proc_logger.info(line)
                     q.put(line)
