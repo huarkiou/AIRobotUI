@@ -1,6 +1,8 @@
 """System tray - minimal code, dispatches actions to main thread."""
 
 import threading
+import webbrowser
+import re
 import pystray
 from pystray import Menu, MenuItem
 from icon import get_green_icon, get_yellow_icon, get_red_icon
@@ -72,7 +74,40 @@ class TrayUI:
             status = "Running" if running else "Stopped"
             return f"  {indicator} {status}"
 
-        return Menu(MenuItem(text, toggle))
+        def webui_label(_) -> str:
+            url = (
+                self._pm.get_napcat_webui_url()
+                if name == "napcat"
+                else self._pm.get_astrbot_webui_url()
+            )
+            if url:
+                m = re.search(r"https?://([^/\s]+)", url)
+                host = m.group(1) if m else ""
+                return f"  Open WebUI ({host})" if host else "  Open WebUI"
+            return "  Open WebUI"
+
+        def webui_visible(_) -> bool:
+            running = (
+                self._pm.is_napcat_running()
+                if name == "napcat"
+                else self._pm.is_astrbot_running()
+            )
+            if not running:
+                return False
+            url = (
+                self._pm.get_napcat_webui_url()
+                if name == "napcat"
+                else self._pm.get_astrbot_webui_url()
+            )
+            return url is not None
+
+        def open_webui(icon, item):
+            self._enqueue(f"webui:{name}")
+
+        return Menu(
+            MenuItem(text, toggle),
+            MenuItem(webui_label, open_webui, visible=webui_visible),
+        )
 
     def _enqueue(self, action: str) -> None:
         self._pending_action = action
