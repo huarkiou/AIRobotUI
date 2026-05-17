@@ -7,6 +7,7 @@ import queue
 import shlex
 import os
 import logging
+import re
 from datetime import datetime
 from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
 
@@ -23,6 +24,8 @@ class ProcessManager:
         self._astrbot_queue: queue.Queue[str] = queue.Queue()
         self._status_listeners: list[callable] = []
         self._notify_listeners: list[callable] = []
+        self._napcat_webui_url: str | None = None
+        self._astrbot_webui_url: str | None = None
 
     # --- Public API ---
 
@@ -96,6 +99,28 @@ class ProcessManager:
         q = self._napcat_queue if name == "napcat" else self._astrbot_queue
         q.put(f"[{ts}] [SYSTEM] {msg}")
 
+    def _try_parse_webui_url(self, name: str, line: str) -> str | None:
+        if name == "napcat":
+            marker = "[WebUi] WebUi User Panel Url: "
+            idx = line.find(marker)
+            if idx == -1:
+                return None
+            rest = line[idx + len(marker):].strip()
+        else:  # astrbot
+            marker = "Starting WebUI at "
+            idx = line.find(marker)
+            if idx == -1:
+                return None
+            rest = line[idx + len(marker):].strip()
+        m = re.search(r"https?://\S+", rest)
+        return m.group(0) if m else None
+
+    def get_napcat_webui_url(self) -> str | None:
+        return self._napcat_webui_url
+
+    def get_astrbot_webui_url(self) -> str | None:
+        return self._astrbot_webui_url
+
     def _name(self, n: str) -> str:
         return "NapCat" if n == "napcat" else "AstrBot"
 
@@ -142,12 +167,18 @@ class ProcessManager:
         proc_logger = (
             get_napcat_logger() if name == "napcat" else get_astrbot_logger()
         )
+        url_parsed = False
         try:
             for line in iter(pipe.readline, ""):
                 line = line.rstrip("\n\r")
                 if line:
                     proc_logger.info(line)
                     q.put(line)
+                    if not url_parsed:
+                        url = self._try_parse_webui_url(name, line)
+                        if url is not None:
+                            setattr(self, f"_{name}_webui_url", url)
+                            url_parsed = True
         except (ValueError, IOError):
             pass
 
@@ -243,5 +274,6 @@ class ProcessManager:
                 except Exception:
                     pass
         self._set_proc(name, None)
+        setattr(self, f"_{name}_webui_url", None)
         self._system_msg(name, f"{pname} stopped")
         self._emit_status()
