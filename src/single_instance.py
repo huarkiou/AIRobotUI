@@ -1,4 +1,5 @@
 """Single-instance enforcement via Windows named mutex."""
+
 import sys
 import ctypes
 
@@ -11,7 +12,7 @@ def ensure_single_instance() -> bool:
     if sys.platform != "win32":
         return True
     kernel32 = ctypes.windll.kernel32
-    handle = kernel32.CreateMutexW(None, True, MUTEX_NAME)
+    kernel32.CreateMutexW(None, True, MUTEX_NAME)
     if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
         return False
     return True

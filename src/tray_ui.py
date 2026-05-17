@@ -56,20 +56,16 @@ class TrayUI:
     def _status_menu(self, name: str) -> Menu:
         def toggle(icon, item):
             running = (
-                self._pm.is_napcat_running()
-                if name == "napcat"
-                else self._pm.is_astrbot_running()
+                self._pm.is_napcat_running() if name == "napcat" else self._pm.is_astrbot_running()
             )
             action = "stop" if running else "start"
             self._enqueue(f"{action}:{name}")
 
         def text(_) -> str:
             running = (
-                self._pm.is_napcat_running()
-                if name == "napcat"
-                else self._pm.is_astrbot_running()
+                self._pm.is_napcat_running() if name == "napcat" else self._pm.is_astrbot_running()
             )
-            indicator = "\u25CF" if running else "\u25CB"
+            indicator = "\u25cf" if running else "\u25cb"
             status = "Running" if running else "Stopped"
             return f"  {indicator} {status}"
 
@@ -87,9 +83,7 @@ class TrayUI:
 
         def webui_visible(_) -> bool:
             running = (
-                self._pm.is_napcat_running()
-                if name == "napcat"
-                else self._pm.is_astrbot_running()
+                self._pm.is_napcat_running() if name == "napcat" else self._pm.is_astrbot_running()
             )
             if not running:
                 return False
@@ -141,6 +135,4 @@ class TrayUI:
 
     def run(self) -> None:
         self._logger.info("Starting tray icon in background thread")
-        threading.Thread(
-            target=self._icon.run, daemon=True, name="tray-icon"
-        ).start()
+        threading.Thread(target=self._icon.run, daemon=True, name="tray-icon").start()

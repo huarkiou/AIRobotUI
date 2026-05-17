@@ -70,12 +70,8 @@ class MainWindow:
 
         # Right-click context menu (already has Clear + Copy)
         context_menu = tk.Menu(text, tearoff=0)
-        context_menu.add_command(
-            label="Clear", command=lambda t=text: self._clear_tab(t)
-        )
-        context_menu.add_command(
-            label="Copy", command=lambda t=text: self._copy_selection(t)
-        )
+        context_menu.add_command(label="Clear", command=lambda t=text: self._clear_tab(t))
+        context_menu.add_command(label="Copy", command=lambda t=text: self._copy_selection(t))
         text.bind(
             "<Button-3>",
             lambda e, m=context_menu: m.tk_popup(e.x_root, e.y_root),

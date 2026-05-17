@@ -11,3 +11,16 @@ dependencies = [
 
 [tool.pyright]
 typeCheckingMode = "basic"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.0",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

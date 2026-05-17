@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv run python -m PyInstaller --onefile --windowed --clean --name AIRobotUI --icon assets/icon.ico --runtime-tmpdir "%LOCALAPPDATA%/AIRobotUI/runtime" src/main.pyw
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AIRobotUI.exe
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

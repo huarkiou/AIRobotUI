@@ -6,13 +6,12 @@ import threading
 import queue
 import shlex
 import os
-import logging
 import re
 from datetime import datetime
 from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
 
 
-_STRIP_ANSI = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+_STRIP_ANSI = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
 
 class ProcessManager:
@@ -41,16 +40,34 @@ class ProcessManager:
     def on_notification(self, cb: callable) -> None:
         self._notify_listeners.append(cb)
 
-    def start_napcat(self) -> None: self._start("napcat")
-    def start_astrbot(self) -> None: self._start("astrbot")
-    def stop_napcat(self) -> None: self._stop("napcat")
-    def stop_astrbot(self) -> None: self._stop("astrbot")
-    def start_all(self) -> None: self.start_napcat(); self.start_astrbot()
-    def stop_all(self) -> None: self.stop_napcat(); self.stop_astrbot()
-    def shutdown(self) -> None: self.stop_all()
+    def start_napcat(self) -> None:
+        self._start("napcat")
 
-    def is_napcat_running(self) -> bool: return self._running("napcat")
-    def is_astrbot_running(self) -> bool: return self._running("astrbot")
+    def start_astrbot(self) -> None:
+        self._start("astrbot")
+
+    def stop_napcat(self) -> None:
+        self._stop("napcat")
+
+    def stop_astrbot(self) -> None:
+        self._stop("astrbot")
+
+    def start_all(self) -> None:
+        self.start_napcat()
+        self.start_astrbot()
+
+    def stop_all(self) -> None:
+        self.stop_napcat()
+        self.stop_astrbot()
+
+    def shutdown(self) -> None:
+        self.stop_all()
+
+    def is_napcat_running(self) -> bool:
+        return self._running("napcat")
+
+    def is_astrbot_running(self) -> bool:
+        return self._running("astrbot")
 
     def poll_crashes(self) -> None:
         """Check for unexpected exits; auto-restart or notify."""
@@ -64,8 +81,9 @@ class ProcessManager:
                 logger = get_main_logger()
                 count = self._restart_count(name)
                 self._set_proc(name, None)
-                logger.warning("%s exited code=%d restarts=%d/%d",
-                               pname, ret, count, self._max_restarts)
+                logger.warning(
+                    "%s exited code=%d restarts=%d/%d", pname, ret, count, self._max_restarts
+                )
                 if count < self._max_restarts:
                     self._inc_restart(name)
                     self._notify(
@@ -103,19 +121,19 @@ class ProcessManager:
         q.put(f"[{ts}] [SYSTEM] {msg}")
 
     def _try_parse_webui_url(self, name: str, line: str) -> str | None:
-        line = _STRIP_ANSI.sub('', line)
+        line = _STRIP_ANSI.sub("", line)
         if name == "napcat":
             marker = "[WebUi] WebUi User Panel Url: "
             idx = line.find(marker)
             if idx == -1:
                 return None
-            rest = line[idx + len(marker):].strip()
+            rest = line[idx + len(marker) :].strip()
         else:  # astrbot
             marker = "Starting WebUI at "
             idx = line.find(marker)
             if idx == -1:
                 return None
-            rest = line[idx + len(marker):].strip()
+            rest = line[idx + len(marker) :].strip()
         m = re.search(r"https?://\S+", rest)
         return m.group(0) if m else None
 
@@ -168,14 +186,12 @@ class ProcessManager:
                 pass
 
     def _reader(self, pipe, q: queue.Queue, name: str) -> None:
-        proc_logger = (
-            get_napcat_logger() if name == "napcat" else get_astrbot_logger()
-        )
+        proc_logger = get_napcat_logger() if name == "napcat" else get_astrbot_logger()
         url_parsed = False
         try:
             for line in iter(pipe.readline, ""):
                 line = line.rstrip("\n\r")
-                line = _STRIP_ANSI.sub('', line)
+                line = _STRIP_ANSI.sub("", line)
                 if line:
                     proc_logger.info(line)
                     q.put(line)
@@ -212,11 +228,7 @@ class ProcessManager:
             return
 
         args = shlex.split(cmd)
-        if (
-            not os.path.isabs(args[0])
-            and os.sep not in args[0]
-            and "/" not in args[0]
-        ):
+        if not os.path.isabs(args[0]) and os.sep not in args[0] and "/" not in args[0]:
             resolved = os.path.join(cwd, args[0])
             if os.path.exists(resolved):
                 args[0] = resolved
@@ -267,7 +279,8 @@ class ProcessManager:
         if sys.platform == "win32":
             subprocess.run(
                 ["taskkill", "/f", "/t", "/pid", str(pid)],
-                capture_output=True, timeout=3,
+                capture_output=True,
+                timeout=3,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
         else:

@@ -65,26 +65,25 @@ class ConfigDialog:
             row=0, column=1, sticky=tk.EW, padx=(5, 2)
         )
         ttk.Button(
-            napcat_frame, text="Browse...",
+            napcat_frame,
+            text="Browse...",
             command=lambda: self._browse_dir(self.napcat_cwd),
         ).grid(row=0, column=2)
 
-        ttk.Label(napcat_frame, text="Command:").grid(
-            row=1, column=0, sticky=tk.W, pady=2
-        )
+        ttk.Label(napcat_frame, text="Command:").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.napcat_cmd = tk.StringVar()
         ttk.Entry(napcat_frame, textvariable=self.napcat_cmd, width=40).grid(
             row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0)
         )
 
-        ttk.Label(napcat_frame, text="Encoding:").grid(
-            row=2, column=0, sticky=tk.W, pady=2
-        )
+        ttk.Label(napcat_frame, text="Encoding:").grid(row=2, column=0, sticky=tk.W, pady=2)
         self.napcat_enc = tk.StringVar(value="utf-8")
         enc_combo_n = ttk.Combobox(
-            napcat_frame, textvariable=self.napcat_enc,
+            napcat_frame,
+            textvariable=self.napcat_enc,
             values=["utf-8", "gbk", "gb2312", "cp936", "shift_jis", "latin-1"],
-            width=15, state="readonly",
+            width=15,
+            state="readonly",
         )
         enc_combo_n.grid(row=2, column=1, sticky=tk.W, padx=(5, 0))
 
@@ -102,26 +101,25 @@ class ConfigDialog:
             row=0, column=1, sticky=tk.EW, padx=(5, 2)
         )
         ttk.Button(
-            astrbot_frame, text="Browse...",
+            astrbot_frame,
+            text="Browse...",
             command=lambda: self._browse_dir(self.astrbot_cwd),
         ).grid(row=0, column=2)
 
-        ttk.Label(astrbot_frame, text="Command:").grid(
-            row=1, column=0, sticky=tk.W, pady=2
-        )
+        ttk.Label(astrbot_frame, text="Command:").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.astrbot_cmd = tk.StringVar()
         ttk.Entry(astrbot_frame, textvariable=self.astrbot_cmd, width=40).grid(
             row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0)
         )
 
-        ttk.Label(astrbot_frame, text="Encoding:").grid(
-            row=2, column=0, sticky=tk.W, pady=2
-        )
+        ttk.Label(astrbot_frame, text="Encoding:").grid(row=2, column=0, sticky=tk.W, pady=2)
         self.astrbot_enc = tk.StringVar(value="utf-8")
         enc_combo_a = ttk.Combobox(
-            astrbot_frame, textvariable=self.astrbot_enc,
+            astrbot_frame,
+            textvariable=self.astrbot_enc,
             values=["utf-8", "gbk", "gb2312", "cp936", "shift_jis", "latin-1"],
-            width=15, state="readonly",
+            width=15,
+            state="readonly",
         )
         enc_combo_a.grid(row=2, column=1, sticky=tk.W, padx=(5, 0))
 
@@ -143,8 +141,12 @@ class ConfigDialog:
         ttk.Label(output_frame, text="Output refresh interval (ms):").pack(side=tk.LEFT)
         self.output_refresh_var = tk.StringVar(value="500")
         ttk.Spinbox(
-            output_frame, textvariable=self.output_refresh_var,
-            from_=100, to=5000, increment=100, width=6,
+            output_frame,
+            textvariable=self.output_refresh_var,
+            from_=100,
+            to=5000,
+            increment=100,
+            width=6,
         ).pack(side=tk.LEFT, padx=(5, 0))
         ttk.Label(output_frame, text="(lower = smoother, higher = less CPU)").pack(
             side=tk.LEFT, padx=(5, 0)
@@ -153,13 +155,9 @@ class ConfigDialog:
         # --- Buttons ---
         btn_frame = ttk.Frame(main_frame)
         btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="Save", command=self._on_save).pack(
-            side=tk.RIGHT, padx=(5, 0)
-        )
+        ttk.Button(btn_frame, text="Save", command=self._on_save).pack(side=tk.RIGHT, padx=(5, 0))
         if not self._blocking:
-            ttk.Button(
-                btn_frame, text="Cancel", command=self._on_cancel
-            ).pack(side=tk.RIGHT)
+            ttk.Button(btn_frame, text="Cancel", command=self._on_cancel).pack(side=tk.RIGHT)
 
     def _browse_dir(self, var: tk.StringVar) -> None:
         path = filedialog.askdirectory(title="Select Working Directory")
@@ -235,9 +233,7 @@ class ConfigDialog:
             self._result = config
             self._on_close()
         else:
-            messagebox.showerror(
-                "Error", "Failed to save configuration.", parent=self.dialog
-            )
+            messagebox.showerror("Error", "Failed to save configuration.", parent=self.dialog)
 
     def _on_cancel(self) -> None:
         self._result = None

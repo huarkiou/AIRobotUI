@@ -28,9 +28,7 @@ def is_autostart_enabled() -> bool:
     """Check if autostart registry entry exists."""
     logger = get_main_logger()
     try:
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_READ
-        ) as key:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_READ) as key:
             winreg.QueryValueEx(key, REG_VALUE_NAME)
             return True
     except FileNotFoundError:
@@ -45,9 +43,7 @@ def enable_autostart() -> bool:
     logger = get_main_logger()
     exe_path = _get_exe_path()
     try:
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_SET_VALUE
-        ) as key:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_SET_VALUE) as key:
             winreg.SetValueEx(key, REG_VALUE_NAME, 0, winreg.REG_SZ, exe_path)
         logger.info("Autostart enabled: %s", exe_path)
         return True
@@ -60,9 +56,7 @@ def disable_autostart() -> bool:
     """Remove autostart registry entry. Returns True on success."""
     logger = get_main_logger()
     try:
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_SET_VALUE
-        ) as key:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_SET_VALUE) as key:
             winreg.DeleteValue(key, REG_VALUE_NAME)
         logger.info("Autostart disabled")
         return True
