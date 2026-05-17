@@ -20,43 +20,36 @@ jobs:
         id: changelog
         shell: bash
         run: |
+          set -e
           TAG="v${{ inputs.version }}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | head -1)
-          if [ -z "$PREV_TAG" ]; then
-            RANGE="HEAD"
-            SINCE="Initial release"
-          else
+          echo "## Changes in $TAG" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          group() {
+            local title="$1"
+            shift
+            local lines
+            lines=$(git log --no-merges --format="- %s (%h)" "$@" 2>/dev/null || true)
+            if [ -n "$lines" ]; then
+              echo "### $title" >> CHANGELOG.md
+              echo "$lines" >> CHANGELOG.md
+              echo "" >> CHANGELOG.md
+            fi
+          }
+
+          # Determine commit range
+          PREV_TAG=$(git tag --sort=-v:refname 2>/dev/null | grep -E '^v[0-9]' | head -1 || true)
+          if [ -n "$PREV_TAG" ]; then
             RANGE="$PREV_TAG..HEAD"
-            SINCE="$PREV_TAG"
+          else
+            RANGE=""
           fi
 
-          {
-            echo "## Changes since $SINCE"
-            echo ""
-
-            FEATS=$(git log $RANGE --no-merges --format="- %s (%h)" --grep="^feat" || true)
-            if [ -n "$FEATS" ]; then
-              echo "### Features"
-              echo "$FEATS"
-              echo ""
-            fi
-
-            FIXES=$(git log $RANGE --no-merges --format="- %s (%h)" --grep="^fix" || true)
-            if [ -n "$FIXES" ]; then
-              echo "### Fixes"
-              echo "$FIXES"
-              echo ""
-            fi
-
-            OTHER=$(git log $RANGE --no-merges --format="- %s (%h)" --perl-regexp --grep="^(chore|docs|ci|refactor|build)" || true)
-            if [ -n "$OTHER" ]; then
-              echo "### Other"
-              echo "$OTHER"
-              echo ""
-            fi
-          } > CHANGELOG.md
+          group "Features" $RANGE --grep="^feat"
+          group "Fixes" $RANGE --grep="^fix"
+          group "Other" $RANGE -E --grep="^(chore|docs|ci|refactor|build)"
 
           cat CHANGELOG.md
 
