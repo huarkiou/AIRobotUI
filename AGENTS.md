@@ -90,3 +90,10 @@
 - 使用 Ruff 作为 formatter + linter：`uv run ruff format src/ && uv run ruff check src/`
 - CI 中通过 GitHub Actions 自动检查（仅当 `.py` 文件变更时触发）。
 - 不要残留未使用的 import 或变量，Ruff 会拦截。
+
+## 崩溃恢复与外部进程接管
+
+- 进程可能被 WebUI 或其他方式外部重启，导致旧 Popen 对象失效而新进程不在管理范围内。
+- `taskkill /f /t /im <进程名>` 可以杀同名外部进程，但对 uv shim 启动的程序无效（shim 立即退出，实际 python.exe 脱离父子关系）。
+- **修复**：添加 `psutil` 依赖，按 cwd 遍历找到持有锁文件的 python.exe 进程，用 `taskkill /f /t /pid` 精确杀掉。
+- 自动重启需加 60 秒冷却（`time.monotonic()` 计时），避免频繁崩溃时重启风暴和通知轰炸。最多 3 次后停止。
