@@ -15,6 +15,7 @@
 - `WM_CLOSE`（`taskkill /pid`，不带 `/f`）对无窗口的控制台进程**完全无效**。不要在这个上面浪费时间。
 - `subprocess.Popen.terminate()` 在 Windows 上调 `TerminateProcess`（等于强杀），不会优雅退出。而且杀不掉 `shell=True` 启动的 cmd.exe 的子进程。
 - 杀进程前**不要**主动 `close()` stdout pipe——让进程终止自然关闭写端，reader 线程收到 EOF 自动退出。先关 pipe 会死锁。
+- **`taskkill /f /t /im <进程名>` 会杀掉系统上所有同名进程，不只是目标进程的子进程。** 对 `QQ.exe` 这类用户也在使用的通用进程名，用 `/im` 会误杀用户的个人应用。正确做法：用 `/pid <pid>` 精确杀，或依赖父进程的 `/t` 级联杀子进程（如 `taskkill /f /t /im NapCatWinBootMain.exe` 的 `/t` 已经覆盖其子进程 QQ.exe）。
 
 ### Output 读取
 - reader 线程只负责读 pipe 和写 queue，**绝不碰 Popen 对象**（不 poll、不 terminate）。
