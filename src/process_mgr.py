@@ -9,6 +9,7 @@ import os
 import re
 import time
 from datetime import datetime
+import psutil
 from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
 
 
@@ -265,6 +266,18 @@ class ProcessManager:
                     timeout=5,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
+                # Kill python.exe holding the lock file (astrbot runs via uv shim)
+                try:
+                    for proc in psutil.process_iter(["pid", "cwd"]):
+                        if proc.info["cwd"] == cwd:
+                            subprocess.run(
+                                ["taskkill", "/f", "/t", "/pid", str(proc.info["pid"])],
+                                capture_output=True,
+                                timeout=5,
+                                creationflags=subprocess.CREATE_NO_WINDOW,
+                            )
+                except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
+                    pass
                 lock = os.path.join(cwd, "astrbot.lock")
                 if os.path.exists(lock):
                     try:
