@@ -1,7 +1,6 @@
 """System tray - minimal code, dispatches actions to main thread."""
 
 import threading
-import webbrowser
 import re
 import pystray
 from pystray import Menu, MenuItem

@@ -2,6 +2,7 @@
 import sys
 import os
 import time
+import webbrowser
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -87,6 +88,22 @@ def main() -> None:
                 pm.start_astrbot()
             elif action == "stop:astrbot":
                 pm.stop_astrbot()
+            elif action == "webui:napcat":
+                url = pm.get_napcat_webui_url()
+                if url:
+                    ok = webbrowser.open(url)
+                    if not ok:
+                        logger.warning("Failed to open NapCat WebUI: %s", url)
+                else:
+                    pm._system_msg("napcat", "NapCat WebUI URL not detected yet")
+            elif action == "webui:astrbot":
+                url = pm.get_astrbot_webui_url()
+                if url:
+                    ok = webbrowser.open(url)
+                    if not ok:
+                        logger.warning("Failed to open AstrBot WebUI: %s", url)
+                else:
+                    pm._system_msg("astrbot", "AstrBot WebUI URL not detected yet")
 
         # 2. Drain output queues to buffers
         _napcat_buf.extend(pm.drain_napcat())
