@@ -7,6 +7,7 @@ import queue
 import shlex
 import os
 import re
+import time  # noqa: F401  (will be used in follow-up task)
 from datetime import datetime
 from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
 
@@ -28,6 +29,8 @@ class ProcessManager:
         self._notify_listeners: list[callable] = []
         self._napcat_webui_url: str | None = None
         self._astrbot_webui_url: str | None = None
+        self._napcat_last_restart: float = 0.0
+        self._astrbot_last_restart: float = 0.0
 
     # --- Public API ---
 
