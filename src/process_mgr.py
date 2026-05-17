@@ -7,6 +7,7 @@ import queue
 import shlex
 import os
 import logging
+from datetime import datetime
 from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
 
 
@@ -90,8 +91,10 @@ class ProcessManager:
         return lines
 
     def _system_msg(self, name: str, msg: str) -> None:
+        now = datetime.now()
+        ts = now.strftime("%Y-%m-%d %H:%M:%S.") + f"{now.microsecond // 1000:03d}"
         q = self._napcat_queue if name == "napcat" else self._astrbot_queue
-        q.put(f"[SYSTEM] {msg}")
+        q.put(f"[{ts}] [SYSTEM] {msg}")
 
     def _name(self, n: str) -> str:
         return "NapCat" if n == "napcat" else "AstrBot"
