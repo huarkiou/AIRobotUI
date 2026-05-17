@@ -3,6 +3,8 @@
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from PIL import ImageTk
+from icon import get_app_icon
 from config import load_config, save_config, get_default_config
 from startup import enable_autostart, disable_autostart, is_autostart_enabled
 from logger import get_main_logger
@@ -16,6 +18,8 @@ class ConfigDialog:
 
         self.dialog = tk.Toplevel(root)
         self.dialog.title("AIRobotUI - Settings")
+        self._tk_icon = ImageTk.PhotoImage(get_app_icon())
+        self.dialog.iconphoto(True, self._tk_icon)
         self.dialog.geometry("550x420")
         self.dialog.resizable(False, False)
         self.dialog.transient(root)

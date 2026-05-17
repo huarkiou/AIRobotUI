@@ -2,6 +2,8 @@
 
 import tkinter as tk
 from tkinter import ttk
+from PIL import ImageTk
+from icon import get_app_icon
 from logger import get_main_logger
 
 MAX_LINES = 5000
@@ -11,6 +13,8 @@ class MainWindow:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("AIRobotUI - Process Control")
+        self._tk_icon = ImageTk.PhotoImage(get_app_icon())
+        self.root.iconphoto(True, self._tk_icon)
         self.root.geometry("800x500")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
