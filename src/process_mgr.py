@@ -73,7 +73,8 @@ class ProcessManager:
         return self._running("astrbot")
 
     def poll_crashes(self) -> None:
-        """Check for unexpected exits; auto-restart or notify."""
+        """Check for unexpected exits; auto-restart with cooldown."""
+        RESTART_COOLDOWN = 60.0
         for name in ("napcat", "astrbot"):
             proc = self._get_proc(name)
             if proc is None:
@@ -83,22 +84,51 @@ class ProcessManager:
                 pname = self._name(name)
                 logger = get_main_logger()
                 count = self._restart_count(name)
+
+                # Mark process as dead and clear stale state
                 self._set_proc(name, None)
+                setattr(self, f"_{name}_webui_url", None)
+
                 logger.warning(
-                    "%s exited code=%d restarts=%d/%d", pname, ret, count, self._max_restarts
+                    "%s exited code=%d restarts=%d/%d",
+                    pname, ret, count, self._max_restarts,
                 )
-                if count < self._max_restarts:
-                    self._inc_restart(name)
-                    self._notify(
-                        f"{pname} Crashed",
-                        f"Auto-restarting ({count + 1}/{self._max_restarts})...",
+
+                if count >= self._max_restarts:
+                    self._system_msg(
+                        name,
+                        f"{pname} max restart attempts ({self._max_restarts}) reached, stopped",
                     )
-                    self._start(name)
-                else:
                     self._notify(
                         f"{pname} Stopped",
                         "Max restart attempts reached.",
                     )
+                    continue
+
+                # Cooldown check
+                now = time.monotonic()
+                last = getattr(self, f"_{name}_last_restart")
+                if count > 0 and now - last < RESTART_COOLDOWN:
+                    remaining = int(RESTART_COOLDOWN - (now - last))
+                    self._system_msg(
+                        name,
+                        f"{pname} restart cooldown, next attempt in {remaining}s",
+                    )
+                    continue
+
+                # Execute restart
+                self._inc_restart(name)
+                setattr(self, f"_{name}_last_restart", now)
+                self._system_msg(
+                    name,
+                    f"{pname} exited (code={ret}), auto-restarting ({count + 1}/{self._max_restarts})...",
+                )
+                self._notify(
+                    f"{pname} Crashed",
+                    f"Auto-restarting ({count + 1}/{self._max_restarts})...",
+                )
+                self._start(name)
+                self._emit_status()
 
     def drain_napcat(self) -> list[str]:
         return self._drain(self._napcat_queue)
