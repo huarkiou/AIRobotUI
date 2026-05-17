@@ -73,3 +73,20 @@
 - `main.pyw` 入口在 `src/` 下，用 `sys.path.insert(0, os.path.dirname(__file__))`。
 - PyInstaller entry 改为 `src/main.pyw`，`--icon assets/icon.ico`。
 - `startup.py` 找 `airobotui.bat` 需 `os.path.dirname` 再上一级到项目根。
+
+## 子进程输出清理
+
+- NapCat 和 AstrBot 的输出包含 ANSI 转义码（颜色控制序列 `\x1b[32m` 等）。
+- ANSI 码如果在 URL 解析之前未清理，会污染解析出的 WebUI URL（如 `http://localhost:6185\x1b[0m`），导致 `webbrowser.open()` 打开空页面。
+- **修复**：reader 线程中用正则 `\x1b\[[0-9;]*[a-zA-Z]` 统一过滤所有 ANSI 序列，在入队和 URL 解析之前执行。
+
+## WebUI URL 检测与菜单刷新
+
+- WebUI URL 在后台 reader 线程中异步解析。解析成功后必须立即调用 `_emit_status()` 触发托盘菜单重建，否则用户要等到下次进程启停才能看到 "Open WebUI" 按钮。
+- `_emit_status()` 触发的回调（`_refresh_icon`）会在 reader 线程执行，pystray 的 `icon.menu` setter 在 Windows 上线程安全。
+
+## 代码质量
+
+- 使用 Ruff 作为 formatter + linter：`uv run ruff format src/ && uv run ruff check src/`
+- CI 中通过 GitHub Actions 自动检查（仅当 `.py` 文件变更时触发）。
+- 不要残留未使用的 import 或变量，Ruff 会拦截。
