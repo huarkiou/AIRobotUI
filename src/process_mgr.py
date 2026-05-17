@@ -85,16 +85,17 @@ class ProcessManager:
                 logger = get_main_logger()
                 count = self._restart_count(name)
 
-                # Mark process as dead and clear stale state
-                self._set_proc(name, None)
-                setattr(self, f"_{name}_webui_url", None)
-
                 logger.warning(
                     "%s exited code=%d restarts=%d/%d",
-                    pname, ret, count, self._max_restarts,
+                    pname,
+                    ret,
+                    count,
+                    self._max_restarts,
                 )
 
                 if count >= self._max_restarts:
+                    self._set_proc(name, None)
+                    setattr(self, f"_{name}_webui_url", None)
                     self._system_msg(
                         name,
                         f"{pname} max restart attempts ({self._max_restarts}) reached, stopped",
@@ -103,6 +104,7 @@ class ProcessManager:
                         f"{pname} Stopped",
                         "Max restart attempts reached.",
                     )
+                    self._emit_status()
                     continue
 
                 # Cooldown check
@@ -116,7 +118,9 @@ class ProcessManager:
                     )
                     continue
 
-                # Execute restart
+                # Mark process as dead and execute restart
+                self._set_proc(name, None)
+                setattr(self, f"_{name}_webui_url", None)
                 self._inc_restart(name)
                 setattr(self, f"_{name}_last_restart", now)
                 self._system_msg(
@@ -127,7 +131,7 @@ class ProcessManager:
                     f"{pname} Crashed",
                     f"Auto-restarting ({count + 1}/{self._max_restarts})...",
                 )
-                self._start(name)
+                self._start(name, _reset_counter=False)
                 self._emit_status()
 
     def drain_napcat(self) -> list[str]:
@@ -237,7 +241,7 @@ class ProcessManager:
         except (ValueError, IOError):
             pass
 
-    def _start(self, name: str) -> None:
+    def _start(self, name: str, _reset_counter: bool = True) -> None:
         logger = get_main_logger()
         pname = self._name(name)
         if self._running(name):
@@ -252,7 +256,8 @@ class ProcessManager:
             if name == "astrbot":
                 subprocess.run(
                     ["taskkill", "/f", "/t", "/im", "astrbot.exe"],
-                    capture_output=True, timeout=5,
+                    capture_output=True,
+                    timeout=5,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
                 lock = os.path.join(cwd, "astrbot.lock")
@@ -268,12 +273,14 @@ class ProcessManager:
             elif name == "napcat":
                 subprocess.run(
                     ["taskkill", "/f", "/t", "/im", "NapCatWinBootMain.exe"],
-                    capture_output=True, timeout=5,
+                    capture_output=True,
+                    timeout=5,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
                 subprocess.run(
                     ["taskkill", "/f", "/t", "/im", "QQ.exe"],
-                    capture_output=True, timeout=5,
+                    capture_output=True,
+                    timeout=5,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
             self._system_msg(name, f"Killed existing {pname} process before starting")
@@ -306,7 +313,8 @@ class ProcessManager:
                 kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
             proc = subprocess.Popen(args, **kwargs)
             self._set_proc(name, proc)
-            self._reset_restart(name)
+            if _reset_counter:
+                self._reset_restart(name)
             q = self._napcat_queue if name == "napcat" else self._astrbot_queue
             threading.Thread(
                 target=self._reader,
