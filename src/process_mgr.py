@@ -217,14 +217,35 @@ class ProcessManager:
         cmd: str = cfg["cmd"]
         enc: str = cfg.get("encoding", "utf-8")
 
-        # Clean stale lock files
-        if name == "astrbot":
-            lock = os.path.join(cwd, "astrbot.lock")
-            if os.path.exists(lock):
-                try:
-                    os.remove(lock)
-                except OSError:
-                    pass
+        # Kill any external instances & clean locks (Windows only)
+        if sys.platform == "win32":
+            if name == "astrbot":
+                subprocess.run(
+                    ["taskkill", "/f", "/im", "astrbot.exe"],
+                    capture_output=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                lock = os.path.join(cwd, "astrbot.lock")
+                if os.path.exists(lock):
+                    try:
+                        os.remove(lock)
+                    except OSError:
+                        subprocess.run(
+                            ["cmd", "/c", "del", "/f", lock],
+                            capture_output=True,
+                            creationflags=subprocess.CREATE_NO_WINDOW,
+                        )
+            elif name == "napcat":
+                subprocess.run(
+                    ["taskkill", "/f", "/im", "QQ.exe"],
+                    capture_output=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                subprocess.run(
+                    ["taskkill", "/f", "/im", "NapCatWinBootMain.exe"],
+                    capture_output=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
 
         if not os.path.exists(cwd):
             logger.error("%s cwd not found: %s", pname, cwd)
