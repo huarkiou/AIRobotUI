@@ -91,17 +91,23 @@ def main() -> None:
             elif action == "webui:napcat":
                 url = pm.get_napcat_webui_url()
                 if url:
-                    ok = webbrowser.open(url)
-                    if not ok:
-                        logger.warning("Failed to open NapCat WebUI: %s", url)
+                    try:
+                        ok = webbrowser.open(url)
+                        if not ok:
+                            logger.warning("Failed to open NapCat WebUI: %s", url)
+                    except Exception:
+                        logger.warning("Failed to open NapCat WebUI: %s", url, exc_info=True)
                 else:
                     pm._system_msg("napcat", "NapCat WebUI URL not detected yet")
             elif action == "webui:astrbot":
                 url = pm.get_astrbot_webui_url()
                 if url:
-                    ok = webbrowser.open(url)
-                    if not ok:
-                        logger.warning("Failed to open AstrBot WebUI: %s", url)
+                    try:
+                        ok = webbrowser.open(url)
+                        if not ok:
+                            logger.warning("Failed to open AstrBot WebUI: %s", url)
+                    except Exception:
+                        logger.warning("Failed to open AstrBot WebUI: %s", url, exc_info=True)
                 else:
                     pm._system_msg("astrbot", "AstrBot WebUI URL not detected yet")
 
