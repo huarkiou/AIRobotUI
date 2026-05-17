@@ -184,6 +184,7 @@ class ProcessManager:
                         if url is not None:
                             setattr(self, f"_{name}_webui_url", url)
                             url_parsed = True
+                            self._emit_status()
         except (ValueError, IOError):
             pass
 
