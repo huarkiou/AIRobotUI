@@ -43,6 +43,7 @@ def get_default_config() -> dict:
             },
         ],
         "output_refresh_ms": 500,
+        "poll_interval_ms": 2000,
         "autostart": False,
     }
 
@@ -74,6 +75,7 @@ def _migrate_old_config(old: dict) -> dict:
     return {
         "processes": processes,
         "output_refresh_ms": old.get("output_refresh_ms", 500),
+        "poll_interval_ms": old.get("poll_interval_ms", 2000),
         "autostart": old.get("autostart", False),
     }
 

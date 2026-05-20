@@ -64,11 +64,12 @@ def main() -> None:
     tray.set_config_callback(open_settings)
 
     # --- Main event tick ---
-    POLL_INTERVAL_MS = 2000
     _last_poll = 0
+    _last_output = 0
+    _buffers: dict[str, list[str]] = {}
 
     def _tick() -> None:
-        nonlocal _last_poll
+        nonlocal _last_poll, _last_output
 
         # 1. Consume pending tray action
         action = tray.consume_action()
@@ -101,20 +102,37 @@ def main() -> None:
                     else:
                         pm._system_msg(name, f"{name} WebUI URL not detected yet")
 
-        # 2. Drain output queues to window tabs
+        # 2. Drain output queues to per-process buffers
         for name in pm.process_names():
-            for line in pm.drain(name):
-                window.append_output(name, line)
+            buf = _buffers.setdefault(name, [])
+            buf.extend(pm.drain(name))
 
-        # 3. Periodic crash poll
+        # 3. Flush buffers to window at configured interval (batch insert to prevent UI freeze)
         now = time.monotonic() * 1000
-        if now - _last_poll >= POLL_INTERVAL_MS:
+        interval = config.get("output_refresh_ms", 500)
+        if now - _last_output >= interval:
+            _last_output = now
+            for name in pm.process_names():
+                buf = _buffers.get(name)
+                if buf:
+                    chunk = "\n".join(buf)
+                    window.append_output(name, chunk)
+                    buf.clear()
+
+        # 4. Periodic crash poll
+        if now - _last_poll >= config.get("poll_interval_ms", 2000):
             _last_poll = now
             pm.poll_crashes()
 
-        # 4. Exit check
+        # 5. Exit check
         if tray._exit_requested:
             logger.info("Exit: hiding window, shutting down...")
+            # Flush remaining output before exit
+            for name in pm.process_names():
+                buf = _buffers.get(name)
+                if buf:
+                    window.append_output(name, "\n".join(buf))
+                    buf.clear()
             pm.shutdown()
             window.hide()
             window.root.quit()

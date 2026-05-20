@@ -83,6 +83,19 @@ class ConfigDialog:
             variable=self.autostart_var,
         ).pack(anchor=tk.W, pady=2)
 
+        poll_frame = ttk.Frame(global_frame)
+        poll_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(poll_frame, text="Crash poll interval (ms):").pack(side=tk.LEFT)
+        self.poll_interval_var = tk.StringVar(value="2000")
+        ttk.Spinbox(
+            poll_frame,
+            textvariable=self.poll_interval_var,
+            from_=500,
+            to=10000,
+            increment=500,
+            width=6,
+        ).pack(side=tk.LEFT, padx=(5, 0))
+
         # --- Processes header + add button ---
         proc_header = ttk.Frame(main_frame)
         proc_header.pack(fill=tk.X, pady=(5, 0))
@@ -91,9 +104,12 @@ class ConfigDialog:
         )
         ttk.Button(proc_header, text="Add Process", command=self._add_process).pack(side=tk.RIGHT)
 
-        # Scrollable process list
-        canvas = tk.Canvas(main_frame, height=260, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
+        # Scrollable process list (wrapped so scrollbar doesn't extend past buttons)
+        list_container = ttk.Frame(main_frame)
+        list_container.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
+
+        canvas = tk.Canvas(list_container, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_container, orient=tk.VERTICAL, command=canvas.yview)
         self._proc_frame = ttk.Frame(canvas)
         self._proc_frame.bind(
             "<Configure>",
@@ -111,9 +127,9 @@ class ConfigDialog:
         canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
         canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
-        # Buttons
+        # Buttons (bottom-right, below scroll area)
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(fill=tk.X, pady=(5, 0))
+        btn_frame.pack(fill=tk.X)
         ttk.Button(btn_frame, text="Save", command=self._on_save).pack(side=tk.RIGHT, padx=(5, 0))
         if not self._blocking:
             ttk.Button(btn_frame, text="Cancel", command=self._on_cancel).pack(side=tk.RIGHT)
@@ -240,6 +256,7 @@ class ConfigDialog:
             )
 
         self.output_refresh_var.set(str(config.get("output_refresh_ms", 500)))
+        self.poll_interval_var.set(str(config.get("poll_interval_ms", 2000)))
         self.autostart_var.set(is_autostart_enabled())
 
     def _validate(self) -> str | None:
@@ -287,6 +304,7 @@ class ConfigDialog:
         config = {
             "processes": processes,
             "output_refresh_ms": int(self.output_refresh_var.get()),
+            "poll_interval_ms": int(self.poll_interval_var.get()),
             "autostart": self.autostart_var.get(),
         }
 
