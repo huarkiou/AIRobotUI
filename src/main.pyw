@@ -1,4 +1,5 @@
-"""AIRobotUI - tray controller for NapCat QQ and AstrBot."""
+"""AIRobotUI - tray controller for managed processes."""
+
 import sys
 import os
 import time
@@ -22,9 +23,8 @@ def main() -> None:
     if not ensure_single_instance():
         logger.warning("Another instance is already running, exiting")
         import tkinter.messagebox
-        tkinter.messagebox.showwarning(
-            "AIRobotUI", "AIRobotUI is already running."
-        )
+
+        tkinter.messagebox.showwarning("AIRobotUI", "AIRobotUI is already running.")
         return
 
     logger.info("=" * 40)
@@ -40,6 +40,9 @@ def main() -> None:
     pm = ProcessManager(config)
     tray = TrayUI(pm, window, config)
 
+    # Set initial tabs
+    window.set_processes(pm.process_names())
+
     _settings_open = False
 
     def open_settings() -> None:
@@ -53,94 +56,67 @@ def main() -> None:
             result = dlg.get_result()
             if result is not None:
                 pm.update_config(result)
+                window.set_processes(pm.process_names())
                 logger.info("Config updated at runtime")
         finally:
             _settings_open = False
 
     tray.set_config_callback(open_settings)
 
-    # --- Main event tick (runs on tkinter main thread) ---
+    # --- Main event tick ---
     POLL_INTERVAL_MS = 2000
     _last_poll = 0
-    _last_output = 0
-    _napcat_buf: list[str] = []
-    _astrbot_buf: list[str] = []
-
-    def _output_interval() -> int:
-        return config.get("output_refresh_ms", 500)
 
     def _tick() -> None:
-        nonlocal _last_poll, _last_output
+        nonlocal _last_poll
 
         # 1. Consume pending tray action
         action = tray.consume_action()
         if action:
             logger.info("Action: %s", action)
-            if action == "start:all":
+            if action == "startall":
                 pm.start_all()
-            elif action == "stop:all":
+            elif action == "stopall":
                 pm.stop_all()
-            elif action == "start:napcat":
-                pm.start_napcat()
-            elif action == "stop:napcat":
-                pm.stop_napcat()
-            elif action == "start:astrbot":
-                pm.start_astrbot()
-            elif action == "stop:astrbot":
-                pm.stop_astrbot()
-            elif action == "webui:napcat":
-                url = pm.get_napcat_webui_url()
-                if url:
-                    try:
-                        ok = webbrowser.open(url)
-                        if not ok:
-                            logger.warning("Failed to open NapCat WebUI: %s", url)
-                    except Exception:
-                        logger.warning("Failed to open NapCat WebUI: %s", url, exc_info=True)
-                else:
-                    pm._system_msg("napcat", "NapCat WebUI URL not detected yet")
-            elif action == "webui:astrbot":
-                url = pm.get_astrbot_webui_url()
-                if url:
-                    try:
-                        ok = webbrowser.open(url)
-                        if not ok:
-                            logger.warning("Failed to open AstrBot WebUI: %s", url)
-                    except Exception:
-                        logger.warning("Failed to open AstrBot WebUI: %s", url, exc_info=True)
-                else:
-                    pm._system_msg("astrbot", "AstrBot WebUI URL not detected yet")
+            elif ":" in action:
+                cmd, _, name = action.partition(":")
+                if cmd == "start":
+                    pm.start(name)
+                elif cmd == "stop":
+                    pm.stop(name)
+                elif cmd == "webui":
+                    url = pm.get_webui_url(name)
+                    if url:
+                        try:
+                            ok = webbrowser.open(url)
+                            if not ok:
+                                logger.warning("Failed to open %s WebUI: %s", name, url)
+                        except Exception:
+                            logger.warning(
+                                "Failed to open %s WebUI: %s",
+                                name,
+                                url,
+                                exc_info=True,
+                            )
+                    else:
+                        pm._system_msg(name, f"{name} WebUI URL not detected yet")
 
-        # 2. Drain output queues to buffers
-        _napcat_buf.extend(pm.drain_napcat())
-        _astrbot_buf.extend(pm.drain_astrbot())
+        # 2. Drain output queues to window tabs
+        for name in pm.process_names():
+            for line in pm.drain(name):
+                window.append_output(name, line)
 
-        # 3. Flush buffers to window at configured interval
+        # 3. Periodic crash poll
         now = time.monotonic() * 1000
-        if now - _last_output >= _output_interval():
-            _last_output = now
-            for line in _napcat_buf:
-                window.append_output("NapCat", line)
-            for line in _astrbot_buf:
-                window.append_output("AstrBot", line)
-            _napcat_buf.clear()
-            _astrbot_buf.clear()
-
-        # 4. Periodic crash poll
         if now - _last_poll >= POLL_INTERVAL_MS:
             _last_poll = now
             pm.poll_crashes()
 
-        # 5. Exit check
+        # 4. Exit check
         if tray._exit_requested:
             logger.info("Exit: hiding window, shutting down...")
-            # Flush remaining output before exit
-            for line in _napcat_buf:
-                window.append_output("NapCat", line)
-            for line in _astrbot_buf:
-                window.append_output("AstrBot", line)
-            window.hide()
             pm.shutdown()
+            window.hide()
             window.root.quit()
             return
 
@@ -151,6 +127,14 @@ def main() -> None:
         window.root.after(300, open_settings)
 
     tray.run()
+
+    # Autostart processes marked for auto-start
+    for proc in config.get("processes", []):
+        if proc.get("autostart"):
+            name = proc["name"]
+            logger.info("Autostart: %s", name)
+            window.root.after(500, lambda n=name: pm.start(n))
+
     window.root.after(100, _tick)
 
     logger.info("Entering tkinter main loop")
@@ -162,15 +146,15 @@ def main() -> None:
         window.destroy()
     except Exception:
         pass
-    # Flush and close all log handlers so files are released
-    for name in ("airobotui.main", "airobotui.napcat", "airobotui.astrbot"):
-        import logging
-        lg = logging.getLogger(name)
+    import logging
+
+    for lg_name in ("airobotui.main",):
+        lg = logging.getLogger(lg_name)
         for h in lg.handlers:
             h.flush()
             h.close()
     logger.info("AIRobotUI exited")
-    os._exit(0)  # Immediate exit - avoids PyInstaller tmp cleanup race
+    os._exit(0)
 
 
 if __name__ == "__main__":
