@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 from logging.handlers import RotatingFileHandler
 
 
@@ -38,10 +39,14 @@ def _create_logger(name: str, filename: str) -> logging.Logger:
     return logger
 
 
+def get_process_logger(name: str) -> logging.Logger:
+    """Get a logger for a managed process. Name is sanitized to a safe filename."""
+    safe = re.sub(r"[^a-zA-Z0-9_\u4e00-\u9fff-]", "_", name).strip("_") or "process"
+    return _create_logger(f"airobotui.process.{safe}", f"{safe}.log")
+
+
 # Module-level singletons
 _main_logger = None
-_napcat_logger = None
-_astrbot_logger = None
 
 
 def get_main_logger() -> logging.Logger:
@@ -52,14 +57,8 @@ def get_main_logger() -> logging.Logger:
 
 
 def get_napcat_logger() -> logging.Logger:
-    global _napcat_logger
-    if _napcat_logger is None:
-        _napcat_logger = _create_logger("airobotui.napcat", "napcat.log")
-    return _napcat_logger
+    return get_process_logger("NapCat")
 
 
 def get_astrbot_logger() -> logging.Logger:
-    global _astrbot_logger
-    if _astrbot_logger is None:
-        _astrbot_logger = _create_logger("airobotui.astrbot", "astrbot.log")
-    return _astrbot_logger
+    return get_process_logger("AstrBot")
