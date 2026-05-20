@@ -1,4 +1,4 @@
-"""System tray - minimal code, dispatches actions to main thread."""
+"""System tray — dynamic menus for all managed processes."""
 
 import threading
 import re
@@ -37,44 +37,38 @@ class TrayUI:
     # --- Menu ---
 
     def _build_menu(self) -> Menu:
-        return Menu(
-            MenuItem("NapCat", self._status_menu("napcat")),
-            MenuItem("AstrBot", self._status_menu("astrbot")),
-            Menu.SEPARATOR,
-            MenuItem("Start All", lambda i, _: self._enqueue("start:all")),
-            MenuItem("Stop All", lambda i, _: self._enqueue("stop:all")),
-            Menu.SEPARATOR,
+        items = []
+        for name in self._pm.process_names():
+            items.append(MenuItem(name, self._status_menu(name)))
+        items.append(Menu.SEPARATOR)
+        items.append(MenuItem("Start All", lambda i, _: self._enqueue("startall")))
+        items.append(MenuItem("Stop All", lambda i, _: self._enqueue("stopall")))
+        items.append(Menu.SEPARATOR)
+        items.append(
             MenuItem(
                 "Show/Hide Window",
                 lambda i, _: self._window.root.after(0, self._window.toggle),
-            ),
-            MenuItem("Settings", lambda i, _: self._cb_settings()),
-            Menu.SEPARATOR,
-            MenuItem("Exit", lambda i, _: self._do_exit(i)),
+            )
         )
+        items.append(MenuItem("Settings", lambda i, _: self._cb_settings()))
+        items.append(Menu.SEPARATOR)
+        items.append(MenuItem("Exit", lambda i, _: self._do_exit(i)))
+        return Menu(*items)
 
     def _status_menu(self, name: str) -> Menu:
         def toggle(icon, item):
-            running = (
-                self._pm.is_napcat_running() if name == "napcat" else self._pm.is_astrbot_running()
-            )
+            running = self._pm.is_running(name)
             action = "stop" if running else "start"
             self._enqueue(f"{action}:{name}")
 
         def text(_) -> str:
-            running = (
-                self._pm.is_napcat_running() if name == "napcat" else self._pm.is_astrbot_running()
-            )
+            running = self._pm.is_running(name)
             indicator = "\u25cf" if running else "\u25cb"
             status = "Running" if running else "Stopped"
             return f"  {indicator} {status}"
 
         def webui_label(_) -> str:
-            url = (
-                self._pm.get_napcat_webui_url()
-                if name == "napcat"
-                else self._pm.get_astrbot_webui_url()
-            )
+            url = self._pm.get_webui_url(name)
             if url:
                 m = re.search(r"https?://([^/\s]+)", url)
                 host = m.group(1) if m else ""
@@ -82,25 +76,19 @@ class TrayUI:
             return "  Open WebUI"
 
         def webui_visible(_) -> bool:
-            running = (
-                self._pm.is_napcat_running() if name == "napcat" else self._pm.is_astrbot_running()
-            )
-            if not running:
+            if not self._pm.is_running(name):
                 return False
-            url = (
-                self._pm.get_napcat_webui_url()
-                if name == "napcat"
-                else self._pm.get_astrbot_webui_url()
-            )
-            return url is not None
+            if not self._pm.has_webui(name):
+                return False
+            return self._pm.get_webui_url(name) is not None
 
         def open_webui(icon, item):
             self._enqueue(f"webui:{name}")
 
-        return Menu(
-            MenuItem(text, toggle),
-            MenuItem(webui_label, open_webui, visible=webui_visible),
-        )
+        items = [MenuItem(text, toggle)]
+        if self._pm.has_webui(name):
+            items.append(MenuItem(webui_label, open_webui, visible=webui_visible))
+        return Menu(*items)
 
     def _enqueue(self, action: str) -> None:
         self._pending_action = action
@@ -115,11 +103,14 @@ class TrayUI:
         icon.stop()
 
     def _refresh_icon(self) -> None:
-        nr = self._pm.is_napcat_running()
-        ar = self._pm.is_astrbot_running()
-        if nr and ar:
+        names = self._pm.process_names()
+        running_count = sum(1 for n in names if self._pm.is_running(n))
+        total = len(names)
+        if total == 0:
+            self._icon.icon = get_red_icon()
+        elif running_count == total:
             self._icon.icon = get_green_icon()
-        elif nr or ar:
+        elif running_count > 0:
             self._icon.icon = get_yellow_icon()
         else:
             self._icon.icon = get_red_icon()
