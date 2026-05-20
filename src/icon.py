@@ -1,5 +1,7 @@
 """Dynamic tray icon generation using Pillow."""
 
+import os
+
 from PIL import Image, ImageDraw
 
 ICON_SIZE = 64
@@ -65,3 +67,9 @@ def get_red_icon() -> Image.Image:
 def get_app_icon() -> Image.Image:
     """Return a blue app icon for window title bars (64x64)."""
     return _make_icon((33, 150, 243))
+
+
+def save_ico(path: str) -> None:
+    """Save the blue app icon as a multi-resolution .ico file for taskbar."""
+    icon = get_app_icon()
+    icon.save(path, format="ICO", sizes=[(64, 64), (32, 32), (16, 16)])
