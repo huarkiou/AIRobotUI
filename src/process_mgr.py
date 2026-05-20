@@ -1,5 +1,6 @@
-"""Process manager - all Popen operations on calling thread (assumed main)."""
+"""Process manager — generic dict-based process registry."""
 
+from dataclasses import dataclass, field
 import subprocess
 import sys
 import threading
@@ -10,35 +11,41 @@ import re
 import time
 from datetime import datetime
 import psutil
-from logger import get_main_logger, get_napcat_logger, get_astrbot_logger
+from logger import get_main_logger, get_process_logger
 
 
 _STRIP_ANSI = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
+MAX_RESTARTS = 3
+RESTART_COOLDOWN = 60.0
+
+
+@dataclass
+class _ProcState:
+    proc: subprocess.Popen | None = None
+    msg_queue: queue.Queue = field(default_factory=queue.Queue)
+    restarts: int = 0
+    webui_url: str | None = None
+    last_restart: float = 0.0
+    cooldown_notified: bool = False
+    cfg: dict = field(default_factory=dict)
+
 
 class ProcessManager:
     def __init__(self, config: dict) -> None:
-        self._config = config
-        self._napcat_proc: subprocess.Popen | None = None
-        self._astrbot_proc: subprocess.Popen | None = None
-        self._napcat_restarts = 0
-        self._astrbot_restarts = 0
-        self._max_restarts = 3
-        self._napcat_queue: queue.Queue[str] = queue.Queue()
-        self._astrbot_queue: queue.Queue[str] = queue.Queue()
+        self._procs: dict[str, _ProcState] = {}
         self._status_listeners: list[callable] = []
         self._notify_listeners: list[callable] = []
-        self._napcat_webui_url: str | None = None
-        self._astrbot_webui_url: str | None = None
-        self._napcat_last_restart: float = 0.0
-        self._astrbot_last_restart: float = 0.0
-        self._napcat_cooldown_notified: bool = False
-        self._astrbot_cooldown_notified: bool = False
+        self._build_from_config(config)
 
     # --- Public API ---
 
     def update_config(self, config: dict) -> None:
-        self._config = config
+        self._build_from_config(config)
+        self._emit_status()
+
+    def process_names(self) -> list[str]:
+        return list(self._procs.keys())
 
     def on_status_change(self, cb: callable) -> None:
         self._status_listeners.append(cb)
@@ -46,110 +53,47 @@ class ProcessManager:
     def on_notification(self, cb: callable) -> None:
         self._notify_listeners.append(cb)
 
-    def start_napcat(self) -> None:
-        self._start("napcat")
+    def start(self, name: str) -> None:
+        self._start(name)
 
-    def start_astrbot(self) -> None:
-        self._start("astrbot")
-
-    def stop_napcat(self) -> None:
-        self._stop("napcat")
-
-    def stop_astrbot(self) -> None:
-        self._stop("astrbot")
+    def stop(self, name: str) -> None:
+        self._stop(name)
 
     def start_all(self) -> None:
-        self.start_napcat()
-        self.start_astrbot()
+        for name in self._procs:
+            self._start(name)
 
     def stop_all(self) -> None:
-        self.stop_napcat()
-        self.stop_astrbot()
+        for name in self._procs:
+            self._stop(name)
 
     def shutdown(self) -> None:
         self.stop_all()
 
-    def is_napcat_running(self) -> bool:
-        return self._running("napcat")
+    def is_running(self, name: str) -> bool:
+        ps = self._procs.get(name)
+        if ps is None:
+            return False
+        return ps.proc is not None and ps.proc.poll() is None
 
-    def is_astrbot_running(self) -> bool:
-        return self._running("astrbot")
+    def has_webui(self, name: str) -> bool:
+        ps = self._procs.get(name)
+        if ps is None:
+            return False
+        return ps.cfg.get("webui_pattern") is not None
 
-    def poll_crashes(self) -> None:
-        """Check for unexpected exits; auto-restart with cooldown."""
-        RESTART_COOLDOWN = 60.0
-        for name in ("napcat", "astrbot"):
-            proc = self._get_proc(name)
-            if proc is None:
-                continue
-            ret = proc.poll()
-            if ret is not None:
-                pname = self._name(name)
-                logger = get_main_logger()
-                count = self._restart_count(name)
+    def get_webui_url(self, name: str) -> str | None:
+        ps = self._procs.get(name)
+        if ps is None:
+            return None
+        return ps.webui_url
 
-                logger.warning(
-                    "%s exited code=%d restarts=%d/%d",
-                    pname,
-                    ret,
-                    count,
-                    self._max_restarts,
-                )
-
-                if count >= self._max_restarts:
-                    self._set_proc(name, None)
-                    setattr(self, f"_{name}_webui_url", None)
-                    self._system_msg(
-                        name,
-                        f"{pname} max restart attempts ({self._max_restarts}) reached, stopped",
-                    )
-                    self._notify(
-                        f"{pname} Stopped",
-                        "Max restart attempts reached.",
-                    )
-                    self._emit_status()
-                    continue
-
-                # Cooldown check
-                now = time.monotonic()
-                last = getattr(self, f"_{name}_last_restart")
-                if count > 0 and now - last < RESTART_COOLDOWN:
-                    if not getattr(self, f"_{name}_cooldown_notified"):
-                        setattr(self, f"_{name}_cooldown_notified", True)
-                        remaining = int(RESTART_COOLDOWN - (now - last))
-                        self._system_msg(
-                            name,
-                            f"{pname} restart cooldown, next attempt in {remaining}s",
-                        )
-                    continue
-
-                # Mark process as dead and execute restart
-                self._set_proc(name, None)
-                setattr(self, f"_{name}_webui_url", None)
-                self._inc_restart(name)
-                setattr(self, f"_{name}_cooldown_notified", False)
-                setattr(self, f"_{name}_last_restart", now)
-                self._system_msg(
-                    name,
-                    f"{pname} exited (code={ret}), auto-restarting ({count + 1}/{self._max_restarts})...",
-                )
-                self._notify(
-                    f"{pname} Crashed",
-                    f"Auto-restarting ({count + 1}/{self._max_restarts})...",
-                )
-                self._start(name, _reset_counter=False)
-                self._emit_status()
-
-    def drain_napcat(self) -> list[str]:
-        return self._drain(self._napcat_queue)
-
-    def drain_astrbot(self) -> list[str]:
-        return self._drain(self._astrbot_queue)
-
-    # --- Internal ---
-
-    def _drain(self, q: queue.Queue) -> list[str]:
+    def drain(self, name: str) -> list[str]:
+        ps = self._procs.get(name)
+        if ps is None:
+            return []
         lines: list[str] = []
+        q = ps.msg_queue
         while True:
             try:
                 lines.append(q.get_nowait())
@@ -157,62 +101,74 @@ class ProcessManager:
                 break
         return lines
 
+    def poll_crashes(self) -> None:
+        for name, ps in self._procs.items():
+            if ps.proc is None:
+                continue
+            ret = ps.proc.poll()
+            if ret is not None:
+                if ps.restarts >= MAX_RESTARTS:
+                    ps.proc = None
+                    ps.webui_url = None
+                    self._system_msg(
+                        name,
+                        f"{name} max restart attempts ({MAX_RESTARTS}) reached, stopped",
+                    )
+                    self._notify(f"{name} Stopped", "Max restart attempts reached.")
+                    self._emit_status()
+                    continue
+
+                now = time.monotonic()
+                if ps.restarts > 0 and now - ps.last_restart < RESTART_COOLDOWN:
+                    if not ps.cooldown_notified:
+                        ps.cooldown_notified = True
+                        remaining = int(RESTART_COOLDOWN - (now - ps.last_restart))
+                        self._system_msg(
+                            name,
+                            f"{name} restart cooldown, next attempt in {remaining}s",
+                        )
+                    continue
+
+                ps.proc = None
+                ps.webui_url = None
+                ps.restarts += 1
+                ps.cooldown_notified = False
+                ps.last_restart = now
+                self._system_msg(
+                    name,
+                    f"{name} exited (code={ret}), auto-restarting ({ps.restarts}/{MAX_RESTARTS})...",
+                )
+                self._notify(
+                    f"{name} Crashed",
+                    f"Auto-restarting ({ps.restarts}/{MAX_RESTARTS})...",
+                )
+                self._start(name, _reset_counter=False)
+                self._emit_status()
+
+    # --- Internal ---
+
+    def _build_from_config(self, config: dict) -> None:
+        new_procs: dict[str, _ProcState] = {}
+        for proc_cfg in config.get("processes", []):
+            name = proc_cfg["name"]
+            if name in self._procs:
+                existing = self._procs[name]
+                existing.cfg = proc_cfg
+                new_procs[name] = existing
+            else:
+                new_procs[name] = _ProcState(cfg=proc_cfg)
+        for old_name in self._procs:
+            if old_name not in new_procs:
+                self._stop_internal(old_name)
+        self._procs = new_procs
+
     def _system_msg(self, name: str, msg: str) -> None:
+        ps = self._procs.get(name)
+        if ps is None:
+            return
         now = datetime.now()
         ts = now.strftime("%Y-%m-%d %H:%M:%S.") + f"{now.microsecond // 1000:03d}"
-        q = self._napcat_queue if name == "napcat" else self._astrbot_queue
-        q.put(f"[{ts}] [SYSTEM] {msg}")
-
-    def _try_parse_webui_url(self, name: str, line: str) -> str | None:
-        line = _STRIP_ANSI.sub("", line)
-        if name == "napcat":
-            marker = "[WebUi] WebUi User Panel Url: "
-            idx = line.find(marker)
-            if idx == -1:
-                return None
-            rest = line[idx + len(marker) :].strip()
-        else:  # astrbot
-            marker = "Starting WebUI at "
-            idx = line.find(marker)
-            if idx == -1:
-                return None
-            rest = line[idx + len(marker) :].strip()
-        m = re.search(r"https?://\S+", rest)
-        return m.group(0) if m else None
-
-    def get_napcat_webui_url(self) -> str | None:
-        return self._napcat_webui_url
-
-    def get_astrbot_webui_url(self) -> str | None:
-        return self._astrbot_webui_url
-
-    def _name(self, n: str) -> str:
-        return "NapCat" if n == "napcat" else "AstrBot"
-
-    def _proc_attr(self, n: str) -> str:
-        return "_napcat_proc" if n == "napcat" else "_astrbot_proc"
-
-    def _restart_attr(self, n: str) -> str:
-        return "_napcat_restarts" if n == "napcat" else "_astrbot_restarts"
-
-    def _get_proc(self, n: str) -> subprocess.Popen | None:
-        return getattr(self, self._proc_attr(n))
-
-    def _set_proc(self, n: str, p: subprocess.Popen | None) -> None:
-        setattr(self, self._proc_attr(n), p)
-
-    def _restart_count(self, n: str) -> int:
-        return getattr(self, self._restart_attr(n))
-
-    def _inc_restart(self, n: str) -> None:
-        setattr(self, self._restart_attr(n), self._restart_count(n) + 1)
-
-    def _reset_restart(self, n: str) -> None:
-        setattr(self, self._restart_attr(n), 0)
-
-    def _running(self, n: str) -> bool:
-        p = self._get_proc(n)
-        return p is not None and p.poll() is None
+        ps.msg_queue.put(f"[{ts}] [SYSTEM] {msg}")
 
     def _notify(self, title: str, msg: str) -> None:
         for cb in self._notify_listeners:
@@ -228,91 +184,78 @@ class ProcessManager:
             except Exception:
                 pass
 
-    def _reader(self, pipe, q: queue.Queue, name: str) -> None:
-        proc_logger = get_napcat_logger() if name == "napcat" else get_astrbot_logger()
-        url_parsed = False
+    def _kill_cwd_processes(self, cwd: str) -> None:
+        """Kill all processes whose cwd matches the given directory."""
+        if not cwd:
+            return
+        norm_cwd = os.path.normpath(cwd)
         try:
-            for line in iter(pipe.readline, ""):
-                line = line.rstrip("\n\r")
-                line = _STRIP_ANSI.sub("", line)
-                if line:
-                    proc_logger.info(line)
-                    q.put(line)
-                    if not url_parsed:
-                        url = self._try_parse_webui_url(name, line)
-                        if url is not None:
-                            setattr(self, f"_{name}_webui_url", url)
-                            url_parsed = True
-                            self._emit_status()
-        except (ValueError, IOError):
+            for proc in psutil.process_iter(["pid", "cwd"]):
+                try:
+                    p_cwd = proc.info["cwd"]
+                    if p_cwd and os.path.normpath(p_cwd) == norm_cwd:
+                        subprocess.run(
+                            ["taskkill", "/f", "/t", "/pid", str(proc.info["pid"])],
+                            capture_output=True,
+                            timeout=5,
+                            creationflags=subprocess.CREATE_NO_WINDOW,
+                        )
+                except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
+                    pass
+        except Exception:
             pass
 
     def _start(self, name: str, _reset_counter: bool = True) -> None:
         logger = get_main_logger()
-        pname = self._name(name)
-        if self._running(name):
+        ps = self._procs.get(name)
+        if ps is None:
             return
-        cfg = self._config[name]
-        cwd: str = cfg["cwd"]
-        cmd: str = cfg["cmd"]
+        if self.is_running(name):
+            return
+
+        cfg = ps.cfg
+        cwd: str = cfg.get("cwd", "")
+        cmd: str = cfg.get("cmd", "")
         enc: str = cfg.get("encoding", "utf-8")
+        singleton: bool = cfg.get("singleton", False)
+        delete_files: list[str] = cfg.get("delete_before_start", [])
 
-        # Kill any external instances & clean locks (Windows only)
-        if sys.platform == "win32":
-            if name == "astrbot":
-                subprocess.run(
-                    ["taskkill", "/f", "/t", "/im", "astrbot.exe"],
-                    capture_output=True,
-                    timeout=5,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-                # Kill python.exe holding the lock file (astrbot runs via uv shim)
+        # Singleton: kill all processes matching cwd
+        if singleton and sys.platform == "win32":
+            self._kill_cwd_processes(cwd)
+
+        # Delete files before start
+        for rel_path in delete_files:
+            file_path = os.path.join(cwd, rel_path) if cwd else rel_path
+            if os.path.exists(file_path):
                 try:
-                    for proc in psutil.process_iter(["pid", "cwd"]):
-                        if proc.info["cwd"] == cwd:
-                            subprocess.run(
-                                ["taskkill", "/f", "/t", "/pid", str(proc.info["pid"])],
-                                capture_output=True,
-                                timeout=5,
-                                creationflags=subprocess.CREATE_NO_WINDOW,
-                            )
-                except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
-                    pass
-                lock = os.path.join(cwd, "astrbot.lock")
-                if os.path.exists(lock):
+                    os.remove(file_path)
+                except PermissionError:
+                    if sys.platform == "win32":
+                        self._kill_cwd_processes(cwd)
+                        time.sleep(0.3)
                     try:
-                        os.remove(lock)
-                    except OSError:
-                        time.sleep(0.5)
-                        try:
-                            os.remove(lock)
-                        except OSError:
-                            pass
-            elif name == "napcat":
-                subprocess.run(
-                    ["taskkill", "/f", "/t", "/im", "NapCatWinBootMain.exe"],
-                    capture_output=True,
-                    timeout=5,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-            self._system_msg(name, f"Killed existing {pname} process before starting")
+                        os.remove(file_path)
+                    except OSError as e:
+                        logger.warning("Failed to delete %s: %s", file_path, e)
 
-        if not os.path.exists(cwd):
-            logger.error("%s cwd not found: %s", pname, cwd)
+        if cwd and not os.path.exists(cwd):
+            logger.error("%s cwd not found: %s", name, cwd)
             return
 
         args = shlex.split(cmd)
         if not os.path.isabs(args[0]) and os.sep not in args[0] and "/" not in args[0]:
-            resolved = os.path.join(cwd, args[0])
-            if os.path.exists(resolved):
-                args[0] = resolved
+            if cwd:
+                resolved = os.path.join(cwd, args[0])
+                if os.path.exists(resolved):
+                    args[0] = resolved
 
-        logger.info("Starting %s: %s", pname, args)
+        logger.info("Starting %s: %s", name, args)
         try:
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
             kwargs: dict = {
-                "cwd": cwd,
+                "cwd": cwd or None,
                 "stdout": subprocess.PIPE,
                 "stderr": subprocess.STDOUT,
                 "stdin": subprocess.DEVNULL,
@@ -324,33 +267,32 @@ class ProcessManager:
             if sys.platform == "win32":
                 kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
             proc = subprocess.Popen(args, **kwargs)
-            self._set_proc(name, proc)
+            ps.proc = proc
             if _reset_counter:
-                self._reset_restart(name)
-            q = self._napcat_queue if name == "napcat" else self._astrbot_queue
+                ps.restarts = 0
             threading.Thread(
                 target=self._reader,
-                args=(proc.stdout, q, name),
+                args=(proc.stdout, ps.msg_queue, name, ps),
                 daemon=True,
             ).start()
-            logger.info("%s started PID=%d", pname, proc.pid)
-            self._system_msg(name, f"{pname} started (PID={proc.pid})")
+            logger.info("%s started PID=%d", name, proc.pid)
+            self._system_msg(name, f"{name} started (PID={proc.pid})")
         except Exception as e:
-            logger.error("Failed to start %s: %s", pname, e)
+            logger.error("Failed to start %s: %s", name, e)
         self._emit_status()
 
     def _stop(self, name: str) -> None:
-        logger = get_main_logger()
-        pname = self._name(name)
-        proc = self._get_proc(name)
-        if proc is None:
-            return
-        pid = proc.pid
-        logger.info("Stopping %s PID=%d", pname, pid)
-        setattr(self, self._restart_attr(name), self._max_restarts)
+        self._stop_internal(name)
+        self._emit_status()
 
-        # taskkill /f /t kills entire process tree (including QQ.exe for NapCat)
-        # Tested: 0.3s, reliable, no orphans. WM_CLOSE doesn't work for either process.
+    def _stop_internal(self, name: str) -> None:
+        logger = get_main_logger()
+        ps = self._procs.get(name)
+        if ps is None or ps.proc is None:
+            return
+        pid = ps.proc.pid
+        logger.info("Stopping %s PID=%d", name, pid)
+        ps.restarts = MAX_RESTARTS
         if sys.platform == "win32":
             subprocess.run(
                 ["taskkill", "/f", "/t", "/pid", str(pid)],
@@ -360,14 +302,34 @@ class ProcessManager:
             )
         else:
             try:
-                proc.terminate()
-                proc.wait(timeout=2)
+                ps.proc.terminate()
+                ps.proc.wait(timeout=2)
             except Exception:
                 try:
-                    proc.kill()
+                    ps.proc.kill()
                 except Exception:
                     pass
-        self._set_proc(name, None)
-        setattr(self, f"_{name}_webui_url", None)
-        self._system_msg(name, f"{pname} stopped")
-        self._emit_status()
+        ps.proc = None
+        ps.webui_url = None
+        self._system_msg(name, f"{name} stopped")
+
+    def _reader(self, pipe, q: queue.Queue, name: str, ps: _ProcState) -> None:
+        proc_logger = get_process_logger(name)
+        url_parsed = False
+        webui_pattern_str = ps.cfg.get("webui_pattern")
+        webui_re = re.compile(webui_pattern_str) if webui_pattern_str else None
+        try:
+            for line in iter(pipe.readline, ""):
+                line = line.rstrip("\n\r")
+                line = _STRIP_ANSI.sub("", line)
+                if line:
+                    proc_logger.info(line)
+                    q.put(line)
+                    if not url_parsed and webui_re is not None:
+                        m = webui_re.search(line)
+                        if m:
+                            ps.webui_url = m.group(1)
+                            url_parsed = True
+                            self._emit_status()
+        except (ValueError, IOError):
+            pass
