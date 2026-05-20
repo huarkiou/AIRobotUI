@@ -1,4 +1,4 @@
-"""Configuration dialog for AIRobotUI."""
+"""Configuration dialog for AIRobotUI — dynamic process list editor."""
 
 import os
 import tkinter as tk
@@ -20,7 +20,7 @@ class ConfigDialog:
         self.dialog.title("AIRobotUI - Settings")
         self._tk_icon = ImageTk.PhotoImage(get_app_icon())
         self.dialog.iconphoto(True, self._tk_icon)
-        self.dialog.geometry("550x420")
+        self.dialog.geometry("650x520")
         self.dialog.resizable(False, False)
         self.dialog.transient(root)
 
@@ -30,11 +30,10 @@ class ConfigDialog:
         py = root.winfo_y()
         pw = root.winfo_width()
         ph = root.winfo_height()
-        dx = px + (pw - 550) // 2
-        dy = py + (ph - 420) // 2
-        self.dialog.geometry(f"550x420+{max(0, dx)}+{max(0, dy)}")
+        dx = px + (pw - 650) // 2
+        dy = py + (ph - 520) // 2
+        self.dialog.geometry(f"650x520+{max(0, dx)}+{max(0, dy)}")
 
-        # Show root briefly so grab_set works, then re-hide after dialog closes
         root_was_hidden = not root.winfo_viewable()
         if root_was_hidden:
             root.deiconify()
@@ -43,13 +42,13 @@ class ConfigDialog:
 
         self.dialog.grab_set()
 
-        # Prevent closing if no config exists (first run)
         self._blocking = load_config() is None
         if self._blocking:
             self.dialog.protocol("WM_DELETE_WINDOW", lambda: None)
         else:
             self.dialog.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self._proc_entries: list[dict] = []
         self._build_ui()
         self._load_current_config()
 
@@ -57,91 +56,36 @@ class ConfigDialog:
         main_frame = ttk.Frame(self.dialog, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # --- NapCat ---
-        napcat_frame = ttk.LabelFrame(main_frame, text="NapCat QQ", padding=5)
-        napcat_frame.pack(fill=tk.X, pady=(0, 5))
-
-        ttk.Label(napcat_frame, text="Working Directory:").grid(
-            row=0, column=0, sticky=tk.W, pady=2
+        # Scrollable process list
+        canvas = tk.Canvas(main_frame, height=320, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
+        self._proc_frame = ttk.Frame(canvas)
+        self._proc_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
         )
-        self.napcat_cwd = tk.StringVar()
-        ttk.Entry(napcat_frame, textvariable=self.napcat_cwd, width=40).grid(
-            row=0, column=1, sticky=tk.EW, padx=(5, 2)
-        )
-        ttk.Button(
-            napcat_frame,
-            text="Browse...",
-            command=lambda: self._browse_dir(self.napcat_cwd),
-        ).grid(row=0, column=2)
+        canvas.create_window((0, 0), window=self._proc_frame, anchor=tk.NW)
+        canvas.configure(yscrollcommand=scrollbar.set)
 
-        ttk.Label(napcat_frame, text="Command:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        self.napcat_cmd = tk.StringVar()
-        ttk.Entry(napcat_frame, textvariable=self.napcat_cmd, width=40).grid(
-            row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0)
-        )
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        ttk.Label(napcat_frame, text="Encoding:").grid(row=2, column=0, sticky=tk.W, pady=2)
-        self.napcat_enc = tk.StringVar(value="utf-8")
-        enc_combo_n = ttk.Combobox(
-            napcat_frame,
-            textvariable=self.napcat_enc,
-            values=["utf-8", "gbk", "gb2312", "cp936", "shift_jis", "latin-1"],
-            width=15,
-            state="readonly",
-        )
-        enc_combo_n.grid(row=2, column=1, sticky=tk.W, padx=(5, 0))
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-        napcat_frame.columnconfigure(1, weight=1)
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
-        # --- AstrBot ---
-        astrbot_frame = ttk.LabelFrame(main_frame, text="AstrBot", padding=5)
-        astrbot_frame.pack(fill=tk.X, pady=(0, 5))
+        # Add button
+        add_btn = ttk.Button(main_frame, text="Add Process", command=self._add_process)
+        add_btn.pack(pady=(5, 0))
 
-        ttk.Label(astrbot_frame, text="Working Directory:").grid(
-            row=0, column=0, sticky=tk.W, pady=2
-        )
-        self.astrbot_cwd = tk.StringVar()
-        ttk.Entry(astrbot_frame, textvariable=self.astrbot_cwd, width=40).grid(
-            row=0, column=1, sticky=tk.EW, padx=(5, 2)
-        )
-        ttk.Button(
-            astrbot_frame,
-            text="Browse...",
-            command=lambda: self._browse_dir(self.astrbot_cwd),
-        ).grid(row=0, column=2)
+        # --- Global settings ---
+        global_frame = ttk.LabelFrame(main_frame, text="Global", padding=5)
+        global_frame.pack(fill=tk.X, pady=(10, 0))
 
-        ttk.Label(astrbot_frame, text="Command:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        self.astrbot_cmd = tk.StringVar()
-        ttk.Entry(astrbot_frame, textvariable=self.astrbot_cmd, width=40).grid(
-            row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0)
-        )
-
-        ttk.Label(astrbot_frame, text="Encoding:").grid(row=2, column=0, sticky=tk.W, pady=2)
-        self.astrbot_enc = tk.StringVar(value="utf-8")
-        enc_combo_a = ttk.Combobox(
-            astrbot_frame,
-            textvariable=self.astrbot_enc,
-            values=["utf-8", "gbk", "gb2312", "cp936", "shift_jis", "latin-1"],
-            width=15,
-            state="readonly",
-        )
-        enc_combo_a.grid(row=2, column=1, sticky=tk.W, padx=(5, 0))
-
-        astrbot_frame.columnconfigure(1, weight=1)
-
-        # --- Autostart ---
-        autostart_frame = ttk.Frame(main_frame)
-        autostart_frame.pack(fill=tk.X, pady=(0, 5))
-        self.autostart_var = tk.BooleanVar()
-        ttk.Checkbutton(
-            autostart_frame,
-            text="Start with Windows (autostart)",
-            variable=self.autostart_var,
-        ).pack(anchor=tk.W)
-
-        # --- Output refresh ---
-        output_frame = ttk.Frame(main_frame)
-        output_frame.pack(fill=tk.X, pady=(0, 10))
+        output_frame = ttk.Frame(global_frame)
+        output_frame.pack(fill=tk.X, pady=2)
         ttk.Label(output_frame, text="Output refresh interval (ms):").pack(side=tk.LEFT)
         self.output_refresh_var = tk.StringVar(value="500")
         ttk.Spinbox(
@@ -156,12 +100,116 @@ class ConfigDialog:
             side=tk.LEFT, padx=(5, 0)
         )
 
-        # --- Buttons ---
+        self.autostart_var = tk.BooleanVar()
+        ttk.Checkbutton(
+            global_frame,
+            text="Start AIRobotUI with Windows (autostart)",
+            variable=self.autostart_var,
+        ).pack(anchor=tk.W, pady=2)
+
+        # Buttons
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(fill=tk.X)
+        btn_frame.pack(fill=tk.X, pady=(10, 0))
         ttk.Button(btn_frame, text="Save", command=self._on_save).pack(side=tk.RIGHT, padx=(5, 0))
         if not self._blocking:
             ttk.Button(btn_frame, text="Cancel", command=self._on_cancel).pack(side=tk.RIGHT)
+
+    def _add_process(self, defaults: dict | None = None) -> None:
+        if defaults is None:
+            defaults = {
+                "name": "",
+                "cwd": "",
+                "cmd": "",
+                "encoding": "utf-8",
+                "singleton": False,
+                "autostart": False,
+                "webui_pattern": "",
+                "delete_before_start": "",
+            }
+
+        idx = len(self._proc_entries)
+        frame = ttk.LabelFrame(self._proc_frame, text=f"Process {idx + 1}", padding=5)
+        frame.pack(fill=tk.X, pady=2)
+
+        v: dict[str, tk.Variable] = {}
+
+        # Row 0: Name
+        ttk.Label(frame, text="Name:").grid(row=0, column=0, sticky=tk.W, pady=1)
+        v["name"] = tk.StringVar(value=defaults["name"])
+        ttk.Entry(frame, textvariable=v["name"], width=20).grid(
+            row=0, column=1, sticky=tk.W, padx=5
+        )
+
+        # Row 1: CWD
+        ttk.Label(frame, text="CWD:").grid(row=1, column=0, sticky=tk.W, pady=1)
+        v["cwd"] = tk.StringVar(value=defaults["cwd"])
+        ttk.Entry(frame, textvariable=v["cwd"], width=50).grid(
+            row=1, column=1, sticky=tk.EW, padx=5
+        )
+        ttk.Button(frame, text="...", width=3, command=lambda: self._browse_dir(v["cwd"])).grid(
+            row=1, column=2
+        )
+
+        # Row 2: Cmd
+        ttk.Label(frame, text="Cmd:").grid(row=2, column=0, sticky=tk.W, pady=1)
+        v["cmd"] = tk.StringVar(value=defaults["cmd"])
+        ttk.Entry(frame, textvariable=v["cmd"], width=50).grid(
+            row=2, column=1, columnspan=2, sticky=tk.EW, padx=5
+        )
+
+        # Row 3: Encoding
+        ttk.Label(frame, text="Encoding:").grid(row=3, column=0, sticky=tk.W, pady=1)
+        v["encoding"] = tk.StringVar(value=defaults["encoding"])
+        ttk.Combobox(
+            frame,
+            textvariable=v["encoding"],
+            values=["utf-8", "gbk", "gb2312", "cp936", "shift_jis", "latin-1"],
+            width=12,
+            state="readonly",
+        ).grid(row=3, column=1, sticky=tk.W, padx=5)
+
+        # Row 4: Singleton, Autostart
+        check_frame = ttk.Frame(frame)
+        check_frame.grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=2)
+        v["singleton"] = tk.BooleanVar(value=defaults["singleton"])
+        ttk.Checkbutton(check_frame, text="Singleton", variable=v["singleton"]).pack(
+            side=tk.LEFT, padx=(0, 10)
+        )
+        v["autostart"] = tk.BooleanVar(value=defaults["autostart"])
+        ttk.Checkbutton(check_frame, text="Autostart", variable=v["autostart"]).pack(side=tk.LEFT)
+
+        # Row 5: WebUI Pattern
+        ttk.Label(frame, text="WebUI Pattern:").grid(row=5, column=0, sticky=tk.W, pady=1)
+        v["webui_pattern"] = tk.StringVar(value=defaults["webui_pattern"])
+        ttk.Entry(frame, textvariable=v["webui_pattern"], width=50).grid(
+            row=5, column=1, columnspan=2, sticky=tk.EW, padx=5
+        )
+
+        # Row 6: Delete before start
+        ttk.Label(frame, text="Delete files:").grid(row=6, column=0, sticky=tk.W, pady=1)
+        v["delete_before_start"] = tk.StringVar(value=defaults["delete_before_start"])
+        ttk.Entry(frame, textvariable=v["delete_before_start"], width=50).grid(
+            row=6, column=1, columnspan=2, sticky=tk.EW, padx=5
+        )
+        ttk.Label(frame, text="(comma-separated, relative to CWD)", foreground="gray").grid(
+            row=7, column=1, columnspan=2, sticky=tk.W, padx=5
+        )
+
+        # Delete button
+        ttk.Button(
+            frame,
+            text="Delete",
+            command=lambda f=frame, idx=idx: self._delete_process(f, idx),
+        ).grid(row=8, column=2, sticky=tk.E, pady=(5, 0))
+
+        frame.columnconfigure(1, weight=1)
+        self._proc_entries.append({"frame": frame, "vars": v})
+
+    def _delete_process(self, frame: ttk.Frame, idx: int) -> None:
+        frame.destroy()
+        del self._proc_entries[idx]
+        for i, entry in enumerate(self._proc_entries):
+            entry["frame"].configure(text=f"Process {i + 1}")
 
     def _browse_dir(self, var: tk.StringVar) -> None:
         path = filedialog.askdirectory(title="Select Working Directory")
@@ -173,36 +221,39 @@ class ConfigDialog:
         if config is None:
             config = get_default_config()
 
-        self.napcat_cwd.set(config["napcat"]["cwd"])
-        self.napcat_cmd.set(config["napcat"]["cmd"])
-        self.napcat_enc.set(config["napcat"].get("encoding", "utf-8"))
-        self.astrbot_cwd.set(config["astrbot"]["cwd"])
-        self.astrbot_cmd.set(config["astrbot"]["cmd"])
-        self.astrbot_enc.set(config["astrbot"].get("encoding", "gbk"))
-        self.autostart_var.set(is_autostart_enabled())
+        for proc in config.get("processes", []):
+            self._add_process(
+                {
+                    "name": proc["name"],
+                    "cwd": proc.get("cwd", ""),
+                    "cmd": proc.get("cmd", ""),
+                    "encoding": proc.get("encoding", "utf-8"),
+                    "singleton": proc.get("singleton", False),
+                    "autostart": proc.get("autostart", False),
+                    "webui_pattern": proc.get("webui_pattern") or "",
+                    "delete_before_start": ", ".join(proc.get("delete_before_start", [])),
+                }
+            )
+
         self.output_refresh_var.set(str(config.get("output_refresh_ms", 500)))
+        self.autostart_var.set(is_autostart_enabled())
 
     def _validate(self) -> str | None:
-        """Validate inputs. Returns error string or None if valid."""
-        if not self.napcat_cwd.get().strip():
-            return "NapCat working directory is required."
-        if not self.napcat_cmd.get().strip():
-            return "NapCat command is required."
-        if not self.astrbot_cwd.get().strip():
-            return "AstrBot working directory is required."
-        if not self.astrbot_cmd.get().strip():
-            return "AstrBot command is required."
-        if not os.path.exists(self.napcat_cwd.get().strip()):
-            return f"NapCat directory does not exist:\n{self.napcat_cwd.get()}"
-        if not os.path.exists(self.astrbot_cwd.get().strip()):
-            return f"AstrBot directory does not exist:\n{self.astrbot_cwd.get()}"
+        names: set[str] = set()
+        for entry in self._proc_entries:
+            v = entry["vars"]
+            name = v["name"].get().strip()
+            if not name:
+                return "Process name cannot be empty."
+            if name in names:
+                return f"Duplicate process name: {name}"
+            names.add(name)
+            cwd = v["cwd"].get().strip()
+            if cwd and not os.path.exists(cwd):
+                return f"CWD not found for '{name}': {cwd}"
+            if not v["cmd"].get().strip():
+                return f"Command is required for '{name}'."
         return None
-
-    def _on_close(self) -> None:
-        """Handle dialog close - re-hide root if needed."""
-        if self._root_was_hidden:
-            self.dialog.master.withdraw()
-        self.dialog.destroy()
 
     def _on_save(self) -> None:
         error = self._validate()
@@ -210,40 +261,51 @@ class ConfigDialog:
             messagebox.showerror("Validation Error", error, parent=self.dialog)
             return
 
+        processes = []
+        for entry in self._proc_entries:
+            v = entry["vars"]
+            delete_files = [
+                f.strip() for f in v["delete_before_start"].get().split(",") if f.strip()
+            ]
+            processes.append(
+                {
+                    "name": v["name"].get().strip(),
+                    "cwd": v["cwd"].get().strip(),
+                    "cmd": v["cmd"].get().strip(),
+                    "encoding": v["encoding"].get().strip(),
+                    "singleton": v["singleton"].get(),
+                    "autostart": v["autostart"].get(),
+                    "webui_pattern": v["webui_pattern"].get().strip() or None,
+                    "delete_before_start": delete_files,
+                }
+            )
+
         config = {
-            "napcat": {
-                "cwd": self.napcat_cwd.get().strip(),
-                "cmd": self.napcat_cmd.get().strip(),
-                "encoding": self.napcat_enc.get().strip(),
-            },
-            "astrbot": {
-                "cwd": self.astrbot_cwd.get().strip(),
-                "cmd": self.astrbot_cmd.get().strip(),
-                "encoding": self.astrbot_enc.get().strip(),
-            },
+            "processes": processes,
             "output_refresh_ms": int(self.output_refresh_var.get()),
             "autostart": self.autostart_var.get(),
         }
 
         if save_config(config):
             self._logger.info("Config saved via settings dialog")
-
-            # Handle autostart
             if config["autostart"]:
                 enable_autostart()
             else:
                 disable_autostart()
-
             self._result = config
             self._on_close()
         else:
             messagebox.showerror("Error", "Failed to save configuration.", parent=self.dialog)
+
+    def _on_close(self) -> None:
+        if self._root_was_hidden:
+            self.dialog.master.withdraw()
+        self.dialog.destroy()
 
     def _on_cancel(self) -> None:
         self._result = None
         self._on_close()
 
     def get_result(self) -> dict | None:
-        """Wait for dialog and return config dict, or None if cancelled."""
         self.dialog.wait_window()
         return self._result
