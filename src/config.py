@@ -18,20 +18,61 @@ def _get_config_path() -> str:
 
 
 def get_default_config() -> dict:
-    """Return default configuration."""
+    """Return default configuration with processes array."""
     return {
-        "napcat": {
-            "cwd": "D:\\Apps\\ai\\AIRobotUI\\napcatqq\\NapCat.44498.Shell",
-            "cmd": "NapCatWinBootMain.exe 2450085301",
-            "encoding": "utf-8",
-        },
-        "astrbot": {
-            "cwd": "D:\\Apps\\ai\\AIRobotUI\\astrbot",
-            "cmd": "astrbot run",
-            "encoding": "utf-8",
-        },
+        "processes": [
+            {
+                "name": "NapCat",
+                "cwd": "D:\\Apps\\ai\\AIRobotUI\\napcatqq\\NapCat.44498.Shell",
+                "cmd": "NapCatWinBootMain.exe 2450085301",
+                "encoding": "utf-8",
+                "singleton": True,
+                "autostart": False,
+                "webui_pattern": "\\[WebUi\\] WebUi User Panel Url: (https?:\\/\\/\\S+)",
+                "delete_before_start": [],
+            },
+            {
+                "name": "AstrBot",
+                "cwd": "D:\\Apps\\ai\\AIRobotUI\\astrbot",
+                "cmd": "astrbot run",
+                "encoding": "utf-8",
+                "singleton": True,
+                "autostart": False,
+                "webui_pattern": "Starting WebUI at (https?:\\/\\/\\S+)",
+                "delete_before_start": ["astrbot.lock"],
+            },
+        ],
         "output_refresh_ms": 500,
         "autostart": False,
+    }
+
+
+def _migrate_old_config(old: dict) -> dict:
+    """Convert old {napcat:{...}, astrbot:{...}} format to processes[] array."""
+    logger = get_main_logger()
+    logger.info("Migrating old config format to new processes[] schema")
+    processes = []
+    for key in ("napcat", "astrbot"):
+        if key in old:
+            proc = old[key]
+            processes.append({
+                "name": "NapCat" if key == "napcat" else "AstrBot",
+                "cwd": proc.get("cwd", ""),
+                "cmd": proc.get("cmd", ""),
+                "encoding": proc.get("encoding", "utf-8"),
+                "singleton": True,
+                "autostart": old.get("autostart", False),
+                "webui_pattern": (
+                    "\\[WebUi\\] WebUi User Panel Url: (https?:\\/\\/\\S+)"
+                    if key == "napcat"
+                    else "Starting WebUI at (https?:\\/\\/\\S+)"
+                ),
+                "delete_before_start": ["astrbot.lock"] if key == "astrbot" else [],
+            })
+    return {
+        "processes": processes,
+        "output_refresh_ms": old.get("output_refresh_ms", 500),
+        "autostart": old.get("autostart", False),
     }
 
 
@@ -47,6 +88,9 @@ def load_config() -> dict | None:
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
+        if "processes" not in config:
+            config = _migrate_old_config(config)
+            save_config(config)
         logger.info("Config loaded from %s", config_path)
         return config
     except (json.JSONDecodeError, IOError) as e:
