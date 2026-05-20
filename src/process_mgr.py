@@ -193,13 +193,21 @@ class ProcessManager:
             for proc in psutil.process_iter(["pid", "cwd"]):
                 try:
                     p_cwd = proc.info["cwd"]
-                    if p_cwd and os.path.normpath(p_cwd) == norm_cwd:
-                        subprocess.run(
-                            ["taskkill", "/f", "/t", "/pid", str(proc.info["pid"])],
-                            capture_output=True,
-                            timeout=5,
-                            creationflags=subprocess.CREATE_NO_WINDOW,
-                        )
+                    if sys.platform == "win32":
+                        if not (
+                            p_cwd
+                            and os.path.normcase(os.path.normpath(p_cwd))
+                            == os.path.normcase(norm_cwd)
+                        ):
+                            continue
+                    elif not (p_cwd and os.path.normpath(p_cwd) == norm_cwd):
+                        continue
+                    subprocess.run(
+                        ["taskkill", "/f", "/t", "/pid", str(proc.info["pid"])],
+                        capture_output=True,
+                        timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
                 except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
                     pass
         except Exception:
@@ -220,6 +228,10 @@ class ProcessManager:
         singleton: bool = cfg.get("singleton", False)
         delete_files: list[str] = cfg.get("delete_before_start", [])
 
+        if not cmd or not cmd.strip():
+            logger.error("%s has empty command, cannot start", name)
+            return
+
         # Singleton: kill all processes matching cwd
         if singleton and sys.platform == "win32":
             self._kill_cwd_processes(cwd)
@@ -227,6 +239,12 @@ class ProcessManager:
         # Delete files before start
         for rel_path in delete_files:
             file_path = os.path.join(cwd, rel_path) if cwd else rel_path
+            if cwd:
+                real_file = os.path.realpath(file_path)
+                real_cwd = os.path.realpath(cwd)
+                if not real_file.startswith(real_cwd + os.sep) and real_file != real_cwd:
+                    logger.warning("delete_before_start path escapes cwd, skipped: %s", rel_path)
+                    continue
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)
