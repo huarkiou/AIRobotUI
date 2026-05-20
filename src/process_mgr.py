@@ -261,7 +261,7 @@ class ProcessManager:
             logger.error("%s cwd not found: %s", name, cwd)
             return
 
-        args = shlex.split(cmd)
+        args = shlex.split(cmd, posix=(sys.platform != "win32"))
         if not os.path.isabs(args[0]) and os.sep not in args[0] and "/" not in args[0]:
             if cwd:
                 resolved = os.path.join(cwd, args[0])
