@@ -55,20 +55,22 @@ def _migrate_old_config(old: dict) -> dict:
     for key in ("napcat", "astrbot"):
         if key in old:
             proc = old[key]
-            processes.append({
-                "name": "NapCat" if key == "napcat" else "AstrBot",
-                "cwd": proc.get("cwd", ""),
-                "cmd": proc.get("cmd", ""),
-                "encoding": proc.get("encoding", "utf-8"),
-                "singleton": True,
-                "autostart": old.get("autostart", False),
-                "webui_pattern": (
-                    "\\[WebUi\\] WebUi User Panel Url: (https?:\\/\\/\\S+)"
-                    if key == "napcat"
-                    else "Starting WebUI at (https?:\\/\\/\\S+)"
-                ),
-                "delete_before_start": ["astrbot.lock"] if key == "astrbot" else [],
-            })
+            processes.append(
+                {
+                    "name": "NapCat" if key == "napcat" else "AstrBot",
+                    "cwd": proc.get("cwd", ""),
+                    "cmd": proc.get("cmd", ""),
+                    "encoding": proc.get("encoding", "utf-8"),
+                    "singleton": True,
+                    "autostart": old.get("autostart", False),
+                    "webui_pattern": (
+                        "\\[WebUi\\] WebUi User Panel Url: (https?:\\/\\/\\S+)"
+                        if key == "napcat"
+                        else "Starting WebUI at (https?:\\/\\/\\S+)"
+                    ),
+                    "delete_before_start": ["astrbot.lock"] if key == "astrbot" else [],
+                }
+            )
     return {
         "processes": processes,
         "output_refresh_ms": old.get("output_refresh_ms", 500),
