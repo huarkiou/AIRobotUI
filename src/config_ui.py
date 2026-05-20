@@ -56,33 +56,9 @@ class ConfigDialog:
         main_frame = ttk.Frame(self.dialog, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Scrollable process list
-        canvas = tk.Canvas(main_frame, height=320, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
-        self._proc_frame = ttk.Frame(canvas)
-        self._proc_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
-        )
-        canvas.create_window((0, 0), window=self._proc_frame, anchor=tk.NW)
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
-        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
-
-        # Add button
-        add_btn = ttk.Button(main_frame, text="Add Process", command=self._add_process)
-        add_btn.pack(pady=(5, 0))
-
-        # --- Global settings ---
+        # --- Global settings (top) ---
         global_frame = ttk.LabelFrame(main_frame, text="Global", padding=5)
-        global_frame.pack(fill=tk.X, pady=(10, 0))
+        global_frame.pack(fill=tk.X, pady=(0, 5))
 
         output_frame = ttk.Frame(global_frame)
         output_frame.pack(fill=tk.X, pady=2)
@@ -107,9 +83,37 @@ class ConfigDialog:
             variable=self.autostart_var,
         ).pack(anchor=tk.W, pady=2)
 
+        # --- Processes header + add button ---
+        proc_header = ttk.Frame(main_frame)
+        proc_header.pack(fill=tk.X, pady=(5, 0))
+        ttk.Label(proc_header, text="Processes", font=("Microsoft YaHei", 9, "bold")).pack(
+            side=tk.LEFT
+        )
+        ttk.Button(proc_header, text="Add Process", command=self._add_process).pack(side=tk.RIGHT)
+
+        # Scrollable process list
+        canvas = tk.Canvas(main_frame, height=260, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
+        self._proc_frame = ttk.Frame(canvas)
+        self._proc_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=self._proc_frame, anchor=tk.NW)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+
         # Buttons
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(fill=tk.X, pady=(10, 0))
+        btn_frame.pack(fill=tk.X, pady=(5, 0))
         ttk.Button(btn_frame, text="Save", command=self._on_save).pack(side=tk.RIGHT, padx=(5, 0))
         if not self._blocking:
             ttk.Button(btn_frame, text="Cancel", command=self._on_cancel).pack(side=tk.RIGHT)
