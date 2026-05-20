@@ -1,7 +1,5 @@
 """Dynamic tray icon generation using Pillow."""
 
-import os
-
 from PIL import Image, ImageDraw
 
 ICON_SIZE = 64
