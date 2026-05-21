@@ -145,6 +145,7 @@ class ConfigDialog:
                 "encoding": "utf-8",
                 "singleton": False,
                 "autostart": False,
+                "cleanup_cwd": False,
                 "webui_pattern": "",
                 "delete_before_start": "",
             }
@@ -199,6 +200,10 @@ class ConfigDialog:
         )
         v["autostart"] = tk.BooleanVar(value=defaults["autostart"])
         ttk.Checkbutton(check_frame, text="Autostart", variable=v["autostart"]).pack(side=tk.LEFT)
+        v["cleanup_cwd"] = tk.BooleanVar(value=defaults["cleanup_cwd"])
+        ttk.Checkbutton(check_frame, text="Cleanup CWD", variable=v["cleanup_cwd"]).pack(
+            side=tk.LEFT, padx=(10, 0)
+        )
 
         # Row 5: WebUI Pattern
         ttk.Label(frame, text="WebUI Pattern:").grid(row=5, column=0, sticky=tk.W, pady=1)
@@ -252,6 +257,7 @@ class ConfigDialog:
                     "encoding": proc.get("encoding", "utf-8"),
                     "singleton": proc.get("singleton", False),
                     "autostart": proc.get("autostart", False),
+                    "cleanup_cwd": proc.get("cleanup_cwd", False),
                     "webui_pattern": proc.get("webui_pattern") or "",
                     "delete_before_start": ", ".join(proc.get("delete_before_start", [])),
                 }
@@ -308,6 +314,7 @@ class ConfigDialog:
                     "encoding": v["encoding"].get().strip(),
                     "singleton": v["singleton"].get(),
                     "autostart": v["autostart"].get(),
+                    "cleanup_cwd": v["cleanup_cwd"].get(),
                     "webui_pattern": v["webui_pattern"].get().strip() or None,
                     "delete_before_start": delete_files,
                 }
