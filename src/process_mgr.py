@@ -114,7 +114,6 @@ class ProcessManager:
                         name,
                         f"{name} max restart attempts ({MAX_RESTARTS}) reached, stopped",
                     )
-                    self._notify(f"{name} Stopped", "Max restart attempts reached.")
                     self._emit_status()
                     continue
 
@@ -137,10 +136,6 @@ class ProcessManager:
                 self._system_msg(
                     name,
                     f"{name} exited (code={ret}), auto-restarting ({ps.restarts}/{MAX_RESTARTS})...",
-                )
-                self._notify(
-                    f"{name} Crashed",
-                    f"Auto-restarting ({ps.restarts}/{MAX_RESTARTS})...",
                 )
                 self._start(name, _reset_counter=False)
                 self._emit_status()
