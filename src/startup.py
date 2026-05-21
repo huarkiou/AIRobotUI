@@ -6,7 +6,7 @@ import winreg
 from logger import get_main_logger
 
 REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-REG_VALUE_NAME = "AIRobotUI"
+REG_VALUE_NAME = "TrayForge"
 
 
 def _get_exe_path() -> str:

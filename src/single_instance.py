@@ -4,7 +4,7 @@ import sys
 import ctypes
 
 
-MUTEX_NAME = "Global\\AIRobotUI_SingleInstance"
+MUTEX_NAME = "Global\\TrayForge_SingleInstance"
 
 
 def ensure_single_instance() -> bool:
