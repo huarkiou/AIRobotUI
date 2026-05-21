@@ -69,7 +69,7 @@ class TrayUI:
             return f"  {indicator} {status}"
 
         def webui_label(_) -> str:
-            return "  Open WebUI"
+            return f"  {self._pm.get_webui_url(name)}"
 
         def webui_visible(_) -> bool:
             if not self._pm.is_running(name):
