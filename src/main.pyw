@@ -155,22 +155,6 @@ def main() -> None:
 
     window.root.after(100, _tick)
 
-    # One-shot warning if no processes are properly configured
-    def _warn_empty_config() -> None:
-        all_empty = True
-        for proc in config.get("processes", []):
-            if proc.get("cwd", "").strip() or proc.get("cmd", "").strip():
-                all_empty = False
-                break
-        if all_empty and pm.process_names():
-            tkinter.messagebox.showwarning(
-                "TrayForge",
-                "No processes are configured.\n\n"
-                "Right-click the tray icon → Settings to add and configure your processes.",
-            )
-
-    window.root.after(4000, _warn_empty_config)
-
     logger.info("Entering tkinter main loop")
     window.root.mainloop()
 
