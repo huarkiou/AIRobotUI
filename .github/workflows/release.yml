@@ -57,13 +57,13 @@ jobs:
         with:
           enable-cache: true
 
-      - run: uv run python -m PyInstaller --onefile --windowed --clean --name AIRobotUI --icon assets/icon.ico --runtime-tmpdir "%LOCALAPPDATA%/AIRobotUI/runtime" src/main.pyw
+      - run: uv run python -m PyInstaller --onefile --windowed --clean --name TrayForge --icon assets/icon.ico --runtime-tmpdir "%LOCALAPPDATA%/TrayForge/runtime" src/main.pyw
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/AIRobotUI.exe
+          files: dist/TrayForge.exe
           tag_name: ${{ steps.changelog.outputs.tag }}
-          name: AIRobotUI ${{ steps.changelog.outputs.tag }}
+          name: TrayForge ${{ steps.changelog.outputs.tag }}
           body_path: CHANGELOG.md
           draft: false
         env:
