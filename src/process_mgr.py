@@ -246,7 +246,9 @@ class ProcessManager:
                 real_file = os.path.realpath(file_path)
                 real_cwd = os.path.realpath(cwd)
                 if not real_file.startswith(real_cwd + os.sep) and real_file != real_cwd:
-                    logger.warning("delete_before_start path escapes cwd, skipped: %s", rel_path)
+                    msg = f"{name} skipped delete {rel_path}: path outside cwd"
+                    logger.warning(msg)
+                    self._system_msg(name, msg)
                     continue
             if os.path.exists(file_path):
                 try:
@@ -258,7 +260,9 @@ class ProcessManager:
                     try:
                         os.remove(file_path)
                     except OSError as e:
-                        logger.warning("Failed to delete %s: %s", file_path, e)
+                        msg = f"{name} failed to delete {rel_path}: {e}"
+                        logger.warning(msg)
+                        self._system_msg(name, msg)
 
         if cwd and not os.path.exists(cwd):
             msg = f"{name} working directory not found: {cwd}"
