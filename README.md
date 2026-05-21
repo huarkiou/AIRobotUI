@@ -125,8 +125,9 @@ TrayForge/
 | `name` | 进程显示名（唯一） |
 | `cwd` | 工作目录，空则用当前目录 |
 | `cmd` | 完整命令行，二进制支持绝对路径或 PATH 搜索 |
-| `singleton` | 单例模式，启动前杀同 cwd 的旧进程 |
+| `singleton` | 单例模式，防止同进程名重复启动 |
 | `autostart` | 随 TrayForge 启动自动拉起 |
+| `cleanup_cwd` | 启动前杀同工作目录的残留进程（默认 false），用于清理僵尸进程 |
 | `webui_pattern` | 正则，捕获组提取 WebUI URL；留空则无 WebUI 菜单 |
 | `delete_before_start` | 启动前删除的文件列表（相对 cwd），被占用时杀占用进程 |
 
