@@ -96,6 +96,7 @@ TrayForge/
       "encoding": "utf-8",
       "singleton": true,
       "autostart": false,
+      "cleanup_cwd": true,
       "webui_pattern": "\\[WebUi\\] WebUi User Panel Url: (https?://\\S+)",
       "delete_before_start": []
     },
@@ -106,6 +107,7 @@ TrayForge/
       "encoding": "utf-8",
       "singleton": true,
       "autostart": false,
+      "cleanup_cwd": true,
       "webui_pattern": "Starting WebUI at (https?://\\S+)",
       "delete_before_start": ["astrbot.lock"]
     }
