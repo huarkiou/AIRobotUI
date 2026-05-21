@@ -12,7 +12,7 @@ import time
 from datetime import datetime
 import psutil
 from logger import get_main_logger, get_process_logger
-from types import ProcessConfig, AppConfig
+from trayforge_types import ProcessConfig, AppConfig
 
 
 _STRIP_ANSI = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")

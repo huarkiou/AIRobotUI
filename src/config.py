@@ -3,7 +3,7 @@
 import json
 import os
 from logger import get_main_logger
-from types import AppConfig
+from trayforge_types import AppConfig
 
 
 def get_data_dir() -> str:

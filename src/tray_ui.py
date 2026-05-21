@@ -6,7 +6,7 @@ from pystray import Menu, MenuItem
 from typing import Callable
 from icon import get_green_icon, get_yellow_icon, get_red_icon
 from logger import get_main_logger
-from types import AppConfig
+from trayforge_types import AppConfig
 
 
 class TrayUI:
