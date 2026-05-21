@@ -1,7 +1,6 @@
 """System tray — dynamic menus for all managed processes."""
 
 import threading
-import re
 import pystray
 from pystray import Menu, MenuItem
 from icon import get_green_icon, get_yellow_icon, get_red_icon
@@ -18,9 +17,9 @@ class TrayUI:
         self._pending_action: str | None = None
 
         self._icon = pystray.Icon(
-            "AIRobotUI",
+            "TrayForge",
             get_red_icon(),
-            "AIRobotUI",
+            "TrayForge",
             menu=self._build_menu(),
         )
         self._pm.on_status_change(self._refresh_icon)
@@ -68,11 +67,6 @@ class TrayUI:
             return f"  {indicator} {status}"
 
         def webui_label(_) -> str:
-            url = self._pm.get_webui_url(name)
-            if url:
-                m = re.search(r"https?://([^/\s]+)", url)
-                host = m.group(1) if m else ""
-                return f"  Open WebUI ({host})" if host else "  Open WebUI"
             return "  Open WebUI"
 
         def webui_visible(_) -> bool:

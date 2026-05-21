@@ -17,7 +17,7 @@ class ConfigDialog:
         self._root_was_hidden = False
 
         self.dialog = tk.Toplevel(root)
-        self.dialog.title("AIRobotUI - Settings")
+        self.dialog.title("TrayForge - Settings")
         self._tk_icon = ImageTk.PhotoImage(get_app_icon())
         self.dialog.iconphoto(True, self._tk_icon)
         self.dialog.geometry("650x520")

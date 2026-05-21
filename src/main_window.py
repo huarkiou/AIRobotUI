@@ -18,10 +18,10 @@ class MainWindow:
         if sys.platform == "win32":
             import ctypes
 
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("AIRobotUI")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("TrayForge")
 
         self.root = tk.Tk()
-        self.root.title("AIRobotUI - Process Control")
+        self.root.title("TrayForge - Process Control")
         self._tk_icon = ImageTk.PhotoImage(get_app_icon())
         self.root.iconphoto(True, self._tk_icon)
 
