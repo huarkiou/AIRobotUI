@@ -1,4 +1,4 @@
-# AIRobotUI Refactor Implementation Plan
+# TrayForge Refactor Implementation Plan
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking.
 

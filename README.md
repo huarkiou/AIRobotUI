@@ -1,8 +1,8 @@
-# AIRobotUI
+# TrayForge
 
 Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、AstrBot、llama.cpp 等多个后台进程。
 
-[![Format Check](https://github.com/huarkiou/AIRobotUI/actions/workflows/format-check.yml/badge.svg)](https://github.com/huarkiou/AIRobotUI/actions/workflows/format-check.yml)
+[![Format Check](https://github.com/huarkiou/TrayForge/actions/workflows/format-check.yml/badge.svg)](https://github.com/huarkiou/TrayForge/actions/workflows/format-check.yml)
 
 ## 功能
 
@@ -20,7 +20,7 @@ Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、As
 ## 系统要求
 
 - Windows 10+
-- Python 3.11+（开发）/ 直接运行 `AIRobotUI.exe`（发布版）
+- Python 3.11+（开发）/ 直接运行 `TrayForge.exe`（发布版）
 
 ## 快速开始
 
@@ -28,25 +28,25 @@ Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、As
 
 ```bash
 git clone <repo>
-cd AIRobotUI
+cd TrayForge
 uv sync
 uv run python src/main.pyw
 ```
 
-或双击 `airobotui.bat`。
+或双击 `trayforge.bat`。
 
 ### 打包
 
 ```bash
 uv sync
 build.bat
-# 输出：dist/AIRobotUI.exe
+# 输出：dist/TrayForge.exe
 ```
 
 ## 项目结构
 
 ```
-AIRobotUI/
+TrayForge/
 ├── .github/workflows/      # CI/CD
 │   ├── format-check.yml    # 代码格式检查
 │   └── release.yml         # 手动发布 exe
@@ -72,7 +72,7 @@ AIRobotUI/
 
 ## 使用说明
 
-1. 双击 `AIRobotUI.exe`，托盘出现红色图标
+1. 双击 `TrayForge.exe`，托盘出现红色图标
 2. 首次运行弹出设置，确认 NapCat 和 AstrBot 路径后保存
 3. 右键托盘 → **NapCat** / **AstrBot** 切换启停
 4. 进程运行后，子菜单出现 **Open WebUI** → 一键打开浏览器管理面板
@@ -82,14 +82,14 @@ AIRobotUI/
 
 ## 配置
 
-配置文件位于 `%LOCALAPPDATA%\AIRobotUI\config.json`（旧格式自动迁移）：
+配置文件位于 `%LOCALAPPDATA%\TrayForge\config.json`（旧格式自动迁移）：
 
 ```json
 {
   "processes": [
     {
       "name": "NapCat",
-      "cwd": "D:\\Apps\\ai\\AIRobotUI\\napcatqq\\NapCat.44498.Shell",
+      "cwd": "D:\\Apps\\ai\\TrayForge\\napcatqq\\NapCat.44498.Shell",
       "cmd": "NapCatWinBootMain.exe 2450085301",
       "encoding": "utf-8",
       "singleton": true,
@@ -99,7 +99,7 @@ AIRobotUI/
     },
     {
       "name": "AstrBot",
-      "cwd": "D:\\Apps\\ai\\AIRobotUI\\astrbot",
+      "cwd": "D:\\Apps\\ai\\TrayForge\\astrbot",
       "cmd": "astrbot run",
       "encoding": "utf-8",
       "singleton": true,
@@ -124,12 +124,12 @@ AIRobotUI/
 | `cwd` | 工作目录，空则用当前目录 |
 | `cmd` | 完整命令行，二进制支持绝对路径或 PATH 搜索 |
 | `singleton` | 单例模式，启动前杀同 cwd 的旧进程 |
-| `autostart` | 随 AIRobotUI 启动自动拉起 |
+| `autostart` | 随 TrayForge 启动自动拉起 |
 | `webui_pattern` | 正则，捕获组提取 WebUI URL；留空则无 WebUI 菜单 |
 | `delete_before_start` | 启动前删除的文件列表（相对 cwd），被占用时杀占用进程 |
 
 ## 日志
 
-日志位于 `%LOCALAPPDATA%\AIRobotUI\logs\`：
-- `airobotui.log` — 应用操作日志
+日志位于 `%LOCALAPPDATA%\TrayForge\logs\`：
+- `trayforge.log` — 应用操作日志
 - `<进程名>.log` — 每进程独立日志（如 `NapCat.log`、`AstrBot.log`、`Llama.log`）
