@@ -170,14 +170,16 @@ class ProcessManager:
             try:
                 cb(title, msg)
             except Exception:
-                pass
+                logger = get_main_logger()
+                logger.warning("notification listener failed", exc_info=True)
 
     def _emit_status(self) -> None:
         for cb in self._status_listeners:
             try:
                 cb()
             except Exception:
-                pass
+                logger = get_main_logger()
+                logger.warning("status listener failed", exc_info=True)
 
     def _kill_cwd_processes(self, cwd: str) -> None:
         """Kill all processes whose cwd matches the given directory."""
@@ -203,8 +205,11 @@ class ProcessManager:
                         timeout=5,
                         creationflags=subprocess.CREATE_NO_WINDOW,
                     )
-                except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
+                except Exception:
+                    logger = get_main_logger()
+                    logger.debug("kill_cwd_processes iter error", exc_info=True)
         except Exception:
             pass
 
