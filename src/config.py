@@ -3,6 +3,7 @@
 import json
 import os
 from logger import get_main_logger
+from types import AppConfig
 
 
 def get_data_dir() -> str:
@@ -17,7 +18,7 @@ def _get_config_path() -> str:
     return os.path.join(get_data_dir(), "config.json")
 
 
-def get_default_config() -> dict:
+def get_default_config() -> AppConfig:
     """Return default configuration with processes array."""
     return {
         "processes": [
@@ -48,7 +49,7 @@ def get_default_config() -> dict:
     }
 
 
-def _migrate_old_config(old: dict) -> dict:
+def _migrate_old_config(old: dict) -> AppConfig:
     """Convert old {napcat:{...}, astrbot:{...}} format to processes[] array."""
     logger = get_main_logger()
     logger.info("Migrating old config format to new processes[] schema")
@@ -80,7 +81,7 @@ def _migrate_old_config(old: dict) -> dict:
     }
 
 
-def load_config() -> dict | None:
+def load_config() -> AppConfig | None:
     """Load config from file. Returns None if file does not exist."""
     logger = get_main_logger()
     config_path = _get_config_path()
@@ -102,7 +103,7 @@ def load_config() -> dict | None:
         return None
 
 
-def save_config(config: dict) -> bool:
+def save_config(config: AppConfig) -> bool:
     """Save config to file. Returns True on success."""
     logger = get_main_logger()
     config_path = _get_config_path()

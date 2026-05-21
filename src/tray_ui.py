@@ -3,16 +3,18 @@
 import threading
 import pystray
 from pystray import Menu, MenuItem
+from typing import Callable
 from icon import get_green_icon, get_yellow_icon, get_red_icon
 from logger import get_main_logger
+from types import AppConfig
 
 
 class TrayUI:
-    def __init__(self, process_mgr, main_window, config) -> None:
+    def __init__(self, process_mgr, main_window, config: AppConfig) -> None:
         self._pm = process_mgr
         self._window = main_window
         self._logger = get_main_logger()
-        self._config_callback: callable | None = None
+        self._config_callback: Callable[[], None] | None = None
         self._exit_requested = False
         self._pending_action: str | None = None
 
@@ -25,7 +27,7 @@ class TrayUI:
         self._pm.on_status_change(self._refresh_icon)
         self._pm.on_notification(self._on_notify)
 
-    def set_config_callback(self, cb: callable) -> None:
+    def set_config_callback(self, cb: Callable[[], None]) -> None:
         self._config_callback = cb
 
     def consume_action(self) -> str | None:

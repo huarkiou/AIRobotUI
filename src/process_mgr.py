@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 import psutil
 from logger import get_main_logger, get_process_logger
+from types import ProcessConfig, AppConfig
 
 
 _STRIP_ANSI = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
@@ -28,11 +29,11 @@ class _ProcState:
     webui_url: str | None = None
     last_restart: float = 0.0
     cooldown_notified: bool = False
-    cfg: dict = field(default_factory=dict)
+    cfg: ProcessConfig = field(default_factory=dict)  # type: ignore[assignment]
 
 
 class ProcessManager:
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: AppConfig) -> None:
         self._procs: dict[str, _ProcState] = {}
         self._status_listeners: list[callable] = []
         self._notify_listeners: list[callable] = []
@@ -40,7 +41,7 @@ class ProcessManager:
 
     # --- Public API ---
 
-    def update_config(self, config: dict) -> None:
+    def update_config(self, config: AppConfig) -> None:
         self._build_from_config(config)
         self._emit_status()
 
@@ -142,7 +143,7 @@ class ProcessManager:
 
     # --- Internal ---
 
-    def _build_from_config(self, config: dict) -> None:
+    def _build_from_config(self, config: AppConfig) -> None:
         new_procs: dict[str, _ProcState] = {}
         for proc_cfg in config.get("processes", []):
             name = proc_cfg["name"]

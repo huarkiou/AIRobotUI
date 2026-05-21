@@ -8,6 +8,7 @@ from icon import get_app_icon
 from config import load_config, save_config, get_default_config
 from startup import enable_autostart, disable_autostart, is_autostart_enabled
 from logger import get_main_logger
+from types import AppConfig
 
 
 class ConfigDialog:
@@ -328,6 +329,6 @@ class ConfigDialog:
         self._result = None
         self._on_close()
 
-    def get_result(self) -> dict | None:
+    def get_result(self) -> AppConfig | None:
         self.dialog.wait_window()
         return self._result
