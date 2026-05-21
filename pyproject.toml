@@ -1,5 +1,5 @@
 [project]
-name = "airobotui"
+name = "trayforge"
 version = "0.1.0"
 description = "Windows system tray controller for NapCat QQ and AstrBot"
 requires-python = ">=3.11"
