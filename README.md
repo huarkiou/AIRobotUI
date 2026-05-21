@@ -89,7 +89,7 @@ TrayForge/
   "processes": [
     {
       "name": "NapCat",
-      "cwd": "D:\\Apps\\ai\\TrayForge\\napcatqq\\NapCat.44498.Shell",
+      "cwd": "D:\\path\\to\\napcat",
       "cmd": "NapCatWinBootMain.exe <your-qq>",
       "encoding": "utf-8",
       "singleton": true,
@@ -99,7 +99,7 @@ TrayForge/
     },
     {
       "name": "AstrBot",
-      "cwd": "D:\\Apps\\ai\\TrayForge\\astrbot",
+      "cwd": "D:\\path\\to\\astrbot",
       "cmd": "astrbot run",
       "encoding": "utf-8",
       "singleton": true,

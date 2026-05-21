@@ -23,8 +23,8 @@ def get_default_config() -> dict:
         "processes": [
             {
                 "name": "NapCat",
-                "cwd": "D:\\Apps\\ai\\AIRobotUI\\napcatqq\\NapCat.44498.Shell",
-                "cmd": "NapCatWinBootMain.exe 2450085301",
+                "cwd": "",
+                "cmd": "NapCatWinBootMain.exe <your-qq>",
                 "encoding": "utf-8",
                 "singleton": True,
                 "autostart": False,
@@ -33,7 +33,7 @@ def get_default_config() -> dict:
             },
             {
                 "name": "AstrBot",
-                "cwd": "D:\\Apps\\ai\\AIRobotUI\\astrbot",
+                "cwd": "",
                 "cmd": "astrbot run",
                 "encoding": "utf-8",
                 "singleton": True,
