@@ -18,7 +18,7 @@ def _get_exe_path() -> str:
         # Running from source - use batch file in project root
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
-        bat_path = os.path.join(project_root, "airobotui.bat")
+        bat_path = os.path.join(project_root, "trayforge.bat")
         if os.path.exists(bat_path):
             return bat_path
         return sys.executable
