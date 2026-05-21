@@ -45,6 +45,8 @@ class TrayUI:
         items.append(MenuItem("Start All", lambda i, _: self._enqueue("startall")))
         items.append(MenuItem("Stop All", lambda i, _: self._enqueue("stopall")))
         items.append(Menu.SEPARATOR)
+        items.append(MenuItem("Reload Config", lambda i, _: self._enqueue("reload")))
+        items.append(Menu.SEPARATOR)
         items.append(
             MenuItem(
                 "Show/Hide Window",

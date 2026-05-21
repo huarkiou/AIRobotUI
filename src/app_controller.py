@@ -58,6 +58,17 @@ class AppController:
             self._pm.start_all()
         elif action == "stopall":
             self._pm.stop_all()
+        elif action == "reload":
+            from config import load_config
+
+            config = load_config()
+            if config:
+                self._config = config
+                self._pm.update_config(config)
+                self._window.set_processes(self._pm.process_names())
+                logger.info("Config reloaded from disk")
+            else:
+                logger.error("Failed to reload config — config file missing or corrupted")
         elif ":" in action:
             cmd, _, name = action.partition(":")
             if cmd == "start":
