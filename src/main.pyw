@@ -1,4 +1,4 @@
-"""AIRobotUI - tray controller for managed processes."""
+"""TrayForge - tray controller for managed processes."""
 
 import sys
 import os
@@ -24,11 +24,11 @@ def main() -> None:
         logger.warning("Another instance is already running, exiting")
         import tkinter.messagebox
 
-        tkinter.messagebox.showwarning("AIRobotUI", "AIRobotUI is already running.")
+        tkinter.messagebox.showwarning("TrayForge", "TrayForge is already running.")
         return
 
     logger.info("=" * 40)
-    logger.info("AIRobotUI starting...")
+    logger.info("TrayForge starting...")
 
     window = MainWindow()
 
@@ -166,12 +166,12 @@ def main() -> None:
         pass
     import logging
 
-    for lg_name in ("airobotui.main",):
+    for lg_name in ("trayforge.main",):
         lg = logging.getLogger(lg_name)
         for h in lg.handlers:
             h.flush()
             h.close()
-    logger.info("AIRobotUI exited")
+    logger.info("TrayForge exited")
     os._exit(0)
 
 
