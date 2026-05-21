@@ -224,7 +224,9 @@ class ProcessManager:
         delete_files: list[str] = cfg.get("delete_before_start", [])
 
         if not cmd or not cmd.strip():
-            logger.error("%s has empty command, cannot start", name)
+            msg = f"{name} has no command configured — open Settings to set cmd"
+            logger.error(msg)
+            self._system_msg(name, msg)
             return
 
         # Singleton: kill all processes matching cwd
@@ -253,7 +255,9 @@ class ProcessManager:
                         logger.warning("Failed to delete %s: %s", file_path, e)
 
         if cwd and not os.path.exists(cwd):
-            logger.error("%s cwd not found: %s", name, cwd)
+            msg = f"{name} working directory not found: {cwd}"
+            logger.error(msg)
+            self._system_msg(name, msg)
             return
 
         args = shlex.split(cmd, posix=(sys.platform != "win32"))
@@ -262,6 +266,18 @@ class ProcessManager:
                 resolved = os.path.join(cwd, args[0])
                 if os.path.exists(resolved):
                     args[0] = resolved
+
+        # Check exe reachable before launching
+        exe = args[0]
+        exe_found = os.path.exists(exe)
+        if not exe_found and (os.sep not in exe and "/" not in exe):
+            # Bare name — will be resolved by PATH in Popen, skip check
+            pass
+        elif not exe_found:
+            msg = f"{name} executable not found: {exe}"
+            logger.error(msg)
+            self._system_msg(name, msg)
+            return
 
         logger.info("Starting %s: %s", name, args)
         try:
@@ -290,8 +306,14 @@ class ProcessManager:
             ).start()
             logger.info("%s started PID=%d", name, proc.pid)
             self._system_msg(name, f"{name} started (PID={proc.pid})")
+        except FileNotFoundError:
+            msg = f"{name} failed to start — command not found: {args[0]}"
+            logger.error(msg)
+            self._system_msg(name, msg)
         except Exception as e:
-            logger.error("Failed to start %s: %s", name, e)
+            msg = f"{name} failed to start: {e}"
+            logger.error(msg)
+            self._system_msg(name, msg)
         self._emit_status()
 
     def _stop(self, name: str) -> None:
