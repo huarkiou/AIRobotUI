@@ -1,4 +1,4 @@
-"""Configuration dialog for AIRobotUI — dynamic process list editor."""
+"""Configuration dialog for TrayForge — dynamic process list editor."""
 
 import os
 import tkinter as tk
@@ -79,7 +79,7 @@ class ConfigDialog:
         self.autostart_var = tk.BooleanVar()
         ttk.Checkbutton(
             global_frame,
-            text="Start AIRobotUI with Windows (autostart)",
+            text="Start TrayForge with Windows (autostart)",
             variable=self.autostart_var,
         ).pack(anchor=tk.W, pady=2)
 
