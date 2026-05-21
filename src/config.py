@@ -1,4 +1,4 @@
-"""Configuration management - reads/writes config.json in %LOCALAPPDATA%\\AIRobotUI\\"""
+"""Configuration management - reads/writes config.json in %LOCALAPPDATA%\\TrayForge\\"""
 
 import json
 import os
@@ -8,7 +8,7 @@ from logger import get_main_logger
 def get_data_dir() -> str:
     """Get or create the data directory under LOCALAPPDATA."""
     local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-    data_dir = os.path.join(local_appdata, "AIRobotUI")
+    data_dir = os.path.join(local_appdata, "TrayForge")
     os.makedirs(data_dir, exist_ok=True)
     return data_dir
 

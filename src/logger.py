@@ -1,4 +1,4 @@
-"""Logging module for AIRobotUI - writes to %%LOCALAPPDATA%%\\AIRobotUI\\logs\\"""
+"""Logging module for TrayForge - writes to %%LOCALAPPDATA%%\\TrayForge\\logs\\"""
 
 import logging
 import os
@@ -9,7 +9,7 @@ from logging.handlers import RotatingFileHandler
 def _get_log_dir() -> str:
     """Get or create the log directory under LOCALAPPDATA."""
     local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-    log_dir = os.path.join(local_appdata, "AIRobotUI", "logs")
+    log_dir = os.path.join(local_appdata, "TrayForge", "logs")
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
@@ -42,7 +42,7 @@ def _create_logger(name: str, filename: str) -> logging.Logger:
 def get_process_logger(name: str) -> logging.Logger:
     """Get a logger for a managed process. Name is sanitized to a safe filename."""
     safe = re.sub(r"[^a-zA-Z0-9_\u4e00-\u9fff-]", "_", name).strip("_") or "process"
-    return _create_logger(f"airobotui.process.{safe}", f"{safe}.log")
+    return _create_logger(f"trayforge.process.{safe}", f"{safe}.log")
 
 
 # Module-level singletons
@@ -52,7 +52,7 @@ _main_logger = None
 def get_main_logger() -> logging.Logger:
     global _main_logger
     if _main_logger is None:
-        _main_logger = _create_logger("airobotui.main", "airobotui.log")
+        _main_logger = _create_logger("trayforge.main", "trayforge.log")
     return _main_logger
 
 
