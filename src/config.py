@@ -29,6 +29,7 @@ def get_default_config() -> AppConfig:
                 "encoding": "utf-8",
                 "singleton": True,
                 "autostart": False,
+                "cleanup_cwd": True,
                 "webui_pattern": "\\[WebUi\\] WebUi User Panel Url: (https?:\\/\\/\\S+)",
                 "delete_before_start": [],
             },
@@ -39,6 +40,7 @@ def get_default_config() -> AppConfig:
                 "encoding": "utf-8",
                 "singleton": True,
                 "autostart": False,
+                "cleanup_cwd": True,
                 "webui_pattern": "Starting WebUI at (https?:\\/\\/\\S+)",
                 "delete_before_start": ["astrbot.lock"],
             },
@@ -65,6 +67,7 @@ def _migrate_old_config(old: dict) -> AppConfig:
                     "encoding": proc.get("encoding", "utf-8"),
                     "singleton": True,
                     "autostart": old.get("autostart", False),
+                    "cleanup_cwd": True,
                     "webui_pattern": (
                         "\\[WebUi\\] WebUi User Panel Url: (https?:\\/\\/\\S+)"
                         if key == "napcat"

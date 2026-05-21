@@ -10,6 +10,7 @@ class ProcessConfig(TypedDict):
     encoding: str
     singleton: bool
     autostart: bool
+    cleanup_cwd: bool
     webui_pattern: str | None
     delete_before_start: list[str]
 

@@ -235,8 +235,9 @@ class ProcessManager:
             self._system_msg(name, msg)
             return
 
-        # Singleton: kill all processes matching cwd
-        if singleton and sys.platform == "win32":
+        # Cleanup cwd: kill all processes matching cwd (for processes that leave zombies)
+        cleanup = cfg.get("cleanup_cwd", singleton)  # migrate: old singleton=true → cleanup=true
+        if cleanup and sys.platform == "win32":
             self._kill_cwd_processes(cwd)
 
         # Delete files before start
