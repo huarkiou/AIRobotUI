@@ -1,6 +1,7 @@
 """Configuration dialog for TrayForge — dynamic process list editor."""
 
 import os
+import re
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from PIL import ImageTk
@@ -270,11 +271,21 @@ class ConfigDialog:
             if name in names:
                 return f"Duplicate process name: {name}"
             names.add(name)
+            if "/" in name or "\\" in name:
+                return f"Process name cannot contain path separators: {name}"
             cwd = v["cwd"].get().strip()
             if cwd and not os.path.exists(cwd):
-                return f"CWD not found for '{name}': {cwd}"
+                self._logger.warning(
+                    "CWD not found for '%s': %s (allowed, may be created later)", name, cwd
+                )
             if not v["cmd"].get().strip():
                 return f"Command is required for '{name}'."
+            webui = v["webui_pattern"].get().strip()
+            if webui:
+                try:
+                    re.compile(webui)
+                except re.error as e:
+                    return f"Invalid regex in WebUI Pattern for '{name}': {e}"
         return None
 
     def _on_save(self) -> None:
