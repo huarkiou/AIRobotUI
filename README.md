@@ -80,6 +80,8 @@ TrayForge/
 6. **Start All** / **Stop All** 一键全控
 7. **Exit** 优雅退出（自动终止所有进程）
 
+> 启动失败时（路径不存在、命令为空等），错误信息会显示在主窗口的输出面板中，方便排查。
+
 ## 配置
 
 配置文件位于 `%LOCALAPPDATA%\TrayForge\config.json`（旧格式自动迁移）：
