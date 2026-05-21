@@ -90,7 +90,7 @@ TrayForge/
     {
       "name": "NapCat",
       "cwd": "D:\\Apps\\ai\\TrayForge\\napcatqq\\NapCat.44498.Shell",
-      "cmd": "NapCatWinBootMain.exe 2450085301",
+      "cmd": "NapCatWinBootMain.exe <your-qq>",
       "encoding": "utf-8",
       "singleton": true,
       "autostart": false,
