@@ -42,9 +42,6 @@ class TrayUI:
         for name in self._pm.process_names():
             items.append(MenuItem(name, self._status_menu(name)))
         items.append(Menu.SEPARATOR)
-        items.append(MenuItem("Start All", lambda i, _: self._enqueue("startall")))
-        items.append(MenuItem("Stop All", lambda i, _: self._enqueue("stopall")))
-        items.append(Menu.SEPARATOR)
         items.append(MenuItem("Reload Config", lambda i, _: self._enqueue("reload")))
         items.append(Menu.SEPARATOR)
         items.append(
