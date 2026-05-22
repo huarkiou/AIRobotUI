@@ -8,7 +8,7 @@ Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、As
 
 - 托盘图标，右键菜单控制（绿/黄/红 三色指示）
 - 通用进程管理，支持添加任意后台进程（NapCat、AstrBot、llama.cpp 等）
-- 每进程独立启停 + Start All / Stop All 一键全控
+- 每进程独立启停
 - 进程运行时自动显示其 WebUI URL 在子菜单中，一键打开浏览器
 - **Reload Config** 运行时重载配置，无需重启
 - 动态 Tab 实时查看每个进程的输出
@@ -78,11 +78,10 @@ TrayForge/
 1. 双击 `TrayForge.exe`，托盘出现红色图标
 2. 首次运行弹出设置，确认 NapCat 和 AstrBot 路径后保存
 3. 右键托盘 → **NapCat** / **AstrBot** 切换启停
-4. 进程运行后，子菜单出现 **Open WebUI** → 一键打开浏览器管理面板
+4. 进程运行后，子菜单显示其 WebUI URL → 一键打开浏览器
 5. **Show/Hide Window** 打开输出面板查看日志
-6. **Start All** / **Stop All** 一键全控
-7. **Reload Config** 运行时从磁盘重载配置文件
-8. **Exit** 优雅退出（自动终止所有进程）
+6. **Reload Config** 运行时从磁盘重载配置文件
+7. **Exit** 优雅退出（自动终止所有进程）
 
 > 启动失败时（路径不存在、命令为空等），错误信息会显示在主窗口的输出面板中，方便排查。
 
