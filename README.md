@@ -9,7 +9,8 @@ Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、As
 - 托盘图标，右键菜单控制（绿/黄/红 三色指示）
 - 通用进程管理，支持添加任意后台进程（NapCat、AstrBot、llama.cpp 等）
 - 每进程独立启停 + Start All / Stop All 一键全控
-- 进程运行时自动显示 **Open WebUI** 按钮（如有），一键打开浏览器
+- 进程运行时自动显示其 WebUI URL 在子菜单中，一键打开浏览器
+- **Reload Config** 运行时重载配置，无需重启
 - 动态 Tab 实时查看每个进程的输出
 - 进程崩溃自动重启（60s 冷却，最多 3 次）
 - Settings 图形化配置：添加/删除/编辑进程，全局参数调整
@@ -52,6 +53,7 @@ TrayForge/
 │   └── release.yml         # 手动发布 exe
 ├── src/                    # 源码
 │   ├── main.pyw            # 入口
+│   ├── app_controller.py   # 应用控制器（事件循环、action 分发）
 │   ├── config.py           # 配置读写
 │   ├── config_ui.py        # 设置对话框
 │   ├── process_mgr.py      # 进程管理器
@@ -60,10 +62,11 @@ TrayForge/
 │   ├── logger.py           # 日志模块
 │   ├── icon.py             # 托盘图标生成
 │   ├── startup.py          # 开机自启
-│   └── single_instance.py  # 单实例保护
+│   ├── single_instance.py  # 单实例保护
+│   └── trayforge_types.py  # 类型定义（ProcessConfig, AppConfig）
 ├── assets/                 # 静态资源
 │   └── icon.ico
-├── tests/                  # 测试（待补充）
+├── tests/                  # 单元测试（29 tests）
 ├── docs/                   # 设计文档
 ├── pyproject.toml
 ├── build.bat
@@ -78,7 +81,8 @@ TrayForge/
 4. 进程运行后，子菜单出现 **Open WebUI** → 一键打开浏览器管理面板
 5. **Show/Hide Window** 打开输出面板查看日志
 6. **Start All** / **Stop All** 一键全控
-7. **Exit** 优雅退出（自动终止所有进程）
+7. **Reload Config** 运行时从磁盘重载配置文件
+8. **Exit** 优雅退出（自动终止所有进程）
 
 > 启动失败时（路径不存在、命令为空等），错误信息会显示在主窗口的输出面板中，方便排查。
 
@@ -129,7 +133,7 @@ TrayForge/
 | `cmd` | 完整命令行，二进制支持绝对路径或 PATH 搜索 |
 | `singleton` | 单例模式，防止同进程名重复启动 |
 | `autostart` | 随 TrayForge 启动自动拉起 |
-| `cleanup_cwd` | 启动前杀同工作目录的残留进程（默认 false），用于清理僵尸进程 |
+| `cleanup_cwd` | 启动前杀同工作目录的残留进程，用于清理僵尸进程 |
 | `webui_pattern` | 正则，捕获组提取 WebUI URL；留空则无 WebUI 菜单 |
 | `delete_before_start` | 启动前删除的文件列表（相对 cwd），被占用时杀占用进程 |
 
