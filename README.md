@@ -82,7 +82,7 @@ TrayForge/
 2. 首次运行弹出设置，确认 NapCat 和 AstrBot 路径后保存
 3. 右键托盘 → **NapCat** / **AstrBot** 切换启停
 4. 进程运行后，子菜单显示其 WebUI URL → 一键打开浏览器
-5. **Show/Hide Window** 打开输出面板查看日志
+5. **Show Window** 打开输出面板查看日志
 6. **Reload Config** 运行时从磁盘重载配置文件
 7. **Exit** 优雅退出（自动终止所有进程）
 
