@@ -1,11 +1,13 @@
 """Integration tests — start TrayForge GUI subprocess, exercise HTTP API, verify cleanup.
 
+Uses TRAYFORGE_DATA_DIR env var to isolate from production config.
 Requires a desktop session (tkinter needs a display).
 Run with: uv run pytest tests/test_integration.py -v -s
 """
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -13,11 +15,16 @@ import urllib.error
 import urllib.request
 
 import pytest
-from config import get_data_dir
 
 
 EXE = os.path.join(os.path.dirname(__file__), "..", "dist", "TrayForge.exe")
 SRC = os.path.join(os.path.dirname(__file__), "..", "src", "main.pyw")
+
+# Test data directory — isolated from production %LOCALAPPDATA%\TrayForge\
+TEST_DATA_DIR = os.path.join(
+    os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
+    "TrayForgeTest",
+)
 
 
 def _get_server_exe():
@@ -29,7 +36,7 @@ def _get_server_exe():
 
 def _wait_for_port(timeout=15):
     """Poll cli_port.txt until a port appears. Returns port or None on timeout."""
-    port_file = os.path.join(get_data_dir(), "cli_port.txt")
+    port_file = os.path.join(TEST_DATA_DIR, "cli_port.txt")
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -58,8 +65,9 @@ def _http_post(port, path):
 
 
 def _write_test_config():
-    """Always write a test config — don't try to preserve original."""
-    config_path = os.path.join(get_data_dir(), "config.json")
+    """Write a test config into TEST_DATA_DIR."""
+    os.makedirs(TEST_DATA_DIR, exist_ok=True)
+    config_path = os.path.join(TEST_DATA_DIR, "config.json")
     test_config = {
         "processes": [
             {
@@ -80,12 +88,11 @@ def _write_test_config():
     }
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(test_config, f, indent=2)
-    return config_path
 
 
 @pytest.fixture(scope="module")
 def server():
-    """Start TrayForge GUI, wait for HTTP server, yield port, then kill and clean up."""
+    """Start TrayForge GUI in isolated test dir, yield port, then kill and clean up."""
     # Kill stale processes from previous failed runs
     if sys.platform == "win32":
         subprocess.run(
@@ -93,33 +100,30 @@ def server():
             capture_output=True,
             timeout=5,
         )
-    # Clean up stale files
-    port_file = os.path.join(get_data_dir(), "cli_port.txt")
-    try:
-        os.remove(port_file)
-    except OSError:
-        pass
 
+    # Clean up from previous test runs and set up fresh test directory
+    if os.path.exists(TEST_DATA_DIR):
+        shutil.rmtree(TEST_DATA_DIR, ignore_errors=True)
     _write_test_config()
 
     exe = _get_server_exe()
-    stderr_file = os.path.join(get_data_dir(), "inttest_stderr.log")
+
+    # Build env that isolates the subprocess to TEST_DATA_DIR
+    env = os.environ.copy()
+    env["TRAYFORGE_DATA_DIR"] = TEST_DATA_DIR
+
     proc = subprocess.Popen(
         exe,
         stdout=subprocess.DEVNULL,
-        stderr=open(stderr_file, "w"),
+        stderr=subprocess.DEVNULL,
+        env=env,
     )
 
     try:
         # Wait for port file
         port = _wait_for_port(timeout=20)
         if port is None:
-            try:
-                with open(stderr_file) as f:
-                    stderr_text = f.read()
-            except Exception:
-                stderr_text = "(could not read stderr)"
-            pytest.fail(f"GUI did not start: port file never appeared\nstderr:\n{stderr_text}")
+            pytest.fail("GUI did not start: port file never appeared")
 
         # Wait for HTTP server to accept connections
         deadline = time.monotonic() + 10
@@ -138,7 +142,7 @@ def server():
         yield port
 
     finally:
-        # Always clean up, even if tests fail
+        # Always clean up
         proc.terminate()
         try:
             proc.wait(timeout=10)
@@ -146,17 +150,10 @@ def server():
             proc.kill()
             proc.wait()
 
-        try:
-            os.remove(port_file)
-        except OSError:
-            pass
+        # Remove test data directory
+        shutil.rmtree(TEST_DATA_DIR, ignore_errors=True)
 
-        try:
-            os.remove(stderr_file)
-        except OSError:
-            pass
-
-        # Aggressive cleanup: ensure no TrayForge left behind
+        # Aggressive: ensure no TrayForge left behind
         if sys.platform == "win32":
             subprocess.run(
                 ["taskkill", "/f", "/im", "TrayForge.exe"],
@@ -200,7 +197,7 @@ class TestIntegration:
         assert code == 404
 
     def test_port_file_exists_while_server_running(self, server):
-        port_file = os.path.join(get_data_dir(), "cli_port.txt")
+        port_file = os.path.join(TEST_DATA_DIR, "cli_port.txt")
         assert os.path.exists(port_file), (
             f"Port file {port_file} should exist while server is running"
         )

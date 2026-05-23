@@ -7,7 +7,11 @@ from trayforge_types import AppConfig
 
 
 def get_data_dir() -> str:
-    """Get or create the data directory under LOCALAPPDATA."""
+    """Get or create the data directory. Respects TRAYFORGE_DATA_DIR env var."""
+    custom = os.environ.get("TRAYFORGE_DATA_DIR")
+    if custom:
+        os.makedirs(custom, exist_ok=True)
+        return custom
     local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
     data_dir = os.path.join(local_appdata, "TrayForge")
     os.makedirs(data_dir, exist_ok=True)
