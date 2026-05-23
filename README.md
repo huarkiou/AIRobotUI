@@ -11,6 +11,7 @@ Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、As
 - 每进程独立启停
 - 进程运行时自动显示其 WebUI URL 在子菜单中，一键打开浏览器
 - **CLI 命令行控制**：`TrayForge.exe list/start/stop/status/reload` 等命令，无需打开 GUI
+- **headless 后台模式**：`TrayForge.exe --headless` 纯后台运行，适合服务器/CI
 - **Reload Config** 运行时重载配置，无需重启
 - 动态 Tab 实时查看每个进程的输出
 - 进程崩溃自动重启（60s 冷却，最多 3 次）
@@ -53,8 +54,9 @@ TrayForge/
 │   ├── format-check.yml    # 代码格式检查
 │   └── release.yml         # 手动发布 exe
 ├── src/                    # 源码
-│   ├── main.pyw            # 入口（无参=GUI，有参=CLI）
-│   ├── app_controller.py   # 应用控制器（事件循环、action 分发、HTTP server 生命周期）
+│   ├── main.pyw            # 入口（无参=GUI，有参=CLI，--headless=后台）
+│   ├── app_controller.py   # 应用控制器（GUI 事件循环、action 分发）
+│   ├── headless_controller.py # 后台模式控制器（Queue 事件循环）
 │   ├── config.py           # 配置读写
 │   ├── config_ui.py        # 设置对话框
 │   ├── process_mgr.py      # 进程管理器
@@ -103,7 +105,17 @@ TrayForge.exe reload            # 通知 GUI 从磁盘重载配置
 TrayForge.exe --help            # 查看帮助
 ```
 
-CLI 通过本地 HTTP (`127.0.0.1:<port>`) 与 GUI 实例通信，无需额外配置。
+CLI 通过本地 HTTP (`127.0.0.1:<port>`) 与实例通信，无需额外配置。
+
+### headless 后台模式
+
+无需桌面环境，纯后台运行 ProcessManager + HTTP 服务：
+
+```bash
+TrayForge.exe --headless    # 启动后台服务
+TrayForge.exe list           # 另一个终端查看状态
+# Ctrl+C 退出
+```
 
 ### 环境变量
 
