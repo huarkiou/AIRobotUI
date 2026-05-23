@@ -55,39 +55,6 @@ def get_default_config() -> AppConfig:
     }
 
 
-def _migrate_old_config(old: dict) -> AppConfig:
-    """Convert old {napcat:{...}, astrbot:{...}} format to processes[] array."""
-    logger = get_main_logger()
-    logger.info("Migrating old config format to new processes[] schema")
-    processes = []
-    for key in ("napcat", "astrbot"):
-        if key in old:
-            proc = old[key]
-            processes.append(
-                {
-                    "name": "NapCat" if key == "napcat" else "AstrBot",
-                    "cwd": proc.get("cwd", ""),
-                    "cmd": proc.get("cmd", ""),
-                    "encoding": proc.get("encoding", "utf-8"),
-                    "singleton": True,
-                    "autostart": old.get("autostart", False),
-                    "cleanup_cwd": True,
-                    "webui_pattern": (
-                        "\\[WebUi\\] WebUi User Panel Url: (https?:\\/\\/\\S+)"
-                        if key == "napcat"
-                        else "Starting WebUI at (https?:\\/\\/\\S+)"
-                    ),
-                    "delete_before_start": ["astrbot.lock"] if key == "astrbot" else [],
-                }
-            )
-    return {
-        "processes": processes,
-        "output_refresh_ms": old.get("output_refresh_ms", 500),
-        "poll_interval_ms": old.get("poll_interval_ms", 2000),
-        "autostart": old.get("autostart", False),
-    }
-
-
 def load_config() -> AppConfig | None:
     """Load config from file. Returns None if file does not exist."""
     logger = get_main_logger()
@@ -100,9 +67,6 @@ def load_config() -> AppConfig | None:
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
-        if "processes" not in config:
-            config = _migrate_old_config(config)
-            save_config(config)
         logger.info("Config loaded from %s", config_path)
         return config
     except (json.JSONDecodeError, IOError) as e:

@@ -1,6 +1,6 @@
-"""Tests for config.py — load, save, migrate, defaults."""
+"""Tests for config.py — load, save, defaults."""
 
-from config import get_default_config, load_config, save_config, _migrate_old_config
+from config import get_default_config, load_config, save_config
 
 
 def test_default_config_structure():
@@ -20,28 +20,6 @@ def test_default_config_returns_fresh_copy_each_time():
     cfg2 = get_default_config()
     assert cfg1 is not cfg2
     assert cfg1["processes"] is not cfg2["processes"]
-
-
-def test_migrate_old_config():
-    old = {
-        "napcat": {"cwd": "/nap", "cmd": "nc.exe"},
-        "astrbot": {"cwd": "/ast", "cmd": "ab.exe", "encoding": "gbk"},
-        "output_refresh_ms": 300,
-        "autostart": True,
-    }
-    new = _migrate_old_config(old)
-    assert len(new["processes"]) == 2
-    napcat = next(p for p in new["processes"] if p["name"] == "NapCat")
-    assert napcat["cwd"] == "/nap"
-    assert napcat["cmd"] == "nc.exe"
-    assert napcat["singleton"] is True
-    astrbot = next(p for p in new["processes"] if p["name"] == "AstrBot")
-    assert astrbot["cwd"] == "/ast"
-    assert astrbot["cmd"] == "ab.exe"
-    assert astrbot["encoding"] == "gbk"
-    assert astrbot["delete_before_start"] == ["astrbot.lock"]
-    assert new["output_refresh_ms"] == 300
-    assert new["autostart"] is True
 
 
 def test_load_config_missing_file():

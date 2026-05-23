@@ -125,7 +125,7 @@ TrayForge.exe list           # 另一个终端查看状态
 
 ## 配置
 
-配置文件位于 `%LOCALAPPDATA%\TrayForge\config.json`（旧格式自动迁移）：
+配置文件位于 `%LOCALAPPDATA%\TrayForge\config.json`：
 
 ```json
 {
