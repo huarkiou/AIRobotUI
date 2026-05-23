@@ -20,3 +20,13 @@ class AppConfig(TypedDict):
     output_refresh_ms: int
     poll_interval_ms: int
     autostart: bool
+
+
+class ProcessStatus(TypedDict):
+    name: str
+    running: bool
+    pid: int | None
+    webui_url: str | None
+    has_webui: bool
+    restarts: int
+    max_restarts: int

@@ -91,6 +91,25 @@ class ProcessManager:
             return False
         return ps.cfg.get("webui_pattern") is not None
 
+    def get_status(self, name: str) -> dict | None:
+        """Return a ProcessStatus dict for the named process, or None if unknown."""
+        from trayforge_types import ProcessStatus
+
+        ps = self._procs.get(name)
+        if ps is None:
+            return None
+        running = ps.proc is not None and ps.proc.poll() is None
+        result: ProcessStatus = {
+            "name": name,
+            "running": running,
+            "pid": ps.proc.pid if running else None,
+            "webui_url": ps.webui_url,
+            "has_webui": ps.cfg.get("webui_pattern") is not None,
+            "restarts": ps.restarts,
+            "max_restarts": MAX_RESTARTS,
+        }
+        return result
+
     def get_webui_url(self, name: str) -> str | None:
         ps = self._procs.get(name)
         if ps is None:

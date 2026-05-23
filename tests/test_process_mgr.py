@@ -277,3 +277,38 @@ class TestStatusListeners:
         pm.on_notification(lambda t, m: notes.append((t, m)))
         pm._notify("Title", "Message")
         assert notes == [("Title", "Message")]
+
+
+class TestGetStatus:
+    def test_get_status_returns_none_for_unknown_process(self, pm):
+        """pm fixture from conftest provides a ProcessManager with default config."""
+        assert pm.get_status("nonexistent") is None
+
+    def test_get_status_returns_dict_for_known_process(self, pm):
+        status = pm.get_status("NapCat")
+        assert status is not None
+        assert status["name"] == "NapCat"
+        assert status["running"] is False
+        assert status["pid"] is None
+        assert status["has_webui"] is True
+        assert status["webui_url"] is None
+        assert status["restarts"] == 0
+        assert status["max_restarts"] == 3
+
+    @patch("threading.Thread")
+    def test_get_status_reflects_running_state(self, mock_thread, pm):
+        # Status before start
+        status = pm.get_status("NapCat")
+        assert status["running"] is False
+
+        # After start — mock Popen to avoid actually spawning
+        mock_proc = MagicMock()
+        mock_proc.pid = 12345
+        mock_proc.poll.return_value = None
+
+        with patch("subprocess.Popen", return_value=mock_proc):
+            pm.start("NapCat")
+
+        status = pm.get_status("NapCat")
+        assert status["running"] is True
+        assert status["pid"] == 12345
