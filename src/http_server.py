@@ -218,17 +218,44 @@ class TrayForgeHTTPHandler(http.server.BaseHTTPRequestHandler):
             self._send_text(200, result)
 
 
-def create_server(pm, root, reload_fn: Callable[[], bool]) -> http.server.HTTPServer:
-    """Create an HTTPServer bound to 127.0.0.1:0 with the handler configured.
+class QueueHandler(TrayForgeHTTPHandler):
+    """HTTP handler variant that marshals to a queue consumed by HeadlessController.
 
-    Returns the server (not yet started). Caller must read server_address[1]
-    for the assigned port, save it, and start serve_forever() in a thread.
+    Class attribute (set by factory):
+        action_queue: queue.Queue — shared queue for marshaling to main thread
     """
 
-    class _Handler(TrayForgeHTTPHandler):
-        pass
+    action_queue = None
 
-    _Handler.pm = pm
-    _Handler.root = root
-    _Handler.reload_fn = reload_fn
-    return http.server.HTTPServer(("127.0.0.1", 0), _Handler)
+    def _marshal(self, fn):
+        """Override: post to action_queue instead of root.after(), block on per-request Event."""
+        result_queue: queue.Queue = queue.Queue()
+        event = threading.Event()
+
+        def wrapper():
+            try:
+                result_queue.put(fn())
+            except Exception as e:
+                result_queue.put(e)
+            finally:
+                event.set()
+
+        self.action_queue.put(wrapper)
+        event.wait()
+        result = result_queue.get()
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+def create_server(
+    pm, root, reload_fn: Callable[[], bool], handler_cls: type = TrayForgeHTTPHandler
+) -> http.server.HTTPServer:
+    """Create an HTTPServer. handler_cls defaults to TrayForgeHTTPHandler (tkinter mode).
+
+    For headless mode, pass handler_cls=QueueHandler and root=None.
+    """
+    handler_cls.pm = pm
+    handler_cls.root = root
+    handler_cls.reload_fn = reload_fn
+    return http.server.HTTPServer(("127.0.0.1", 0), handler_cls)
