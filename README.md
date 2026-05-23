@@ -2,7 +2,6 @@
 
 Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、AstrBot、llama.cpp 等多个后台进程。
 
-[![Format Check](https://github.com/huarkiou/TrayForge/actions/workflows/format-check.yml/badge.svg)](https://github.com/huarkiou/TrayForge/actions/workflows/format-check.yml)
 [![Test](https://github.com/huarkiou/TrayForge/actions/workflows/test.yml/badge.svg)](https://github.com/huarkiou/TrayForge/actions/workflows/test.yml)
 
 ## 功能
