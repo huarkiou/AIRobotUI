@@ -1,0 +1,3 @@
+[2026-05-20 22:19:06] [INFO] Migrating old config format to new processes[] schema
+[2026-05-20 22:19:06] [INFO] Config saved to D:\Projects\Program\AIRobotUI\_test_migration_verify\AIRobotUI\config.json
+[2026-05-20 22:19:06] [INFO] Config loaded from D:\Projects\Program\AIRobotUI\_test_migration_verify\AIRobotUI\config.json

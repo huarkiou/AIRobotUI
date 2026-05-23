@@ -224,8 +224,10 @@ def create_server(pm, root, reload_fn: Callable[[], bool]) -> http.server.HTTPSe
     Returns the server (not yet started). Caller must read server_address[1]
     for the assigned port, save it, and start serve_forever() in a thread.
     """
+
     class _Handler(TrayForgeHTTPHandler):
         pass
+
     _Handler.pm = pm
     _Handler.root = root
     _Handler.reload_fn = reload_fn

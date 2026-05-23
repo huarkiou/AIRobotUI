@@ -19,7 +19,9 @@ def get_port() -> int | None:
         return None
 
 
-def send_request(port: int, path: str, *, method: str = "GET", name: str | None = None) -> tuple[int, str]:
+def send_request(
+    port: int, path: str, *, method: str = "GET", name: str | None = None
+) -> tuple[int, str]:
     """Send an HTTP request to the server. Returns (status_code, body_text).
     status_code 0 means a transport-level error (connection refused, timeout, etc.).
     """
