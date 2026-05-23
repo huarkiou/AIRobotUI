@@ -90,9 +90,29 @@ def _write_test_config():
         json.dump(test_config, f, indent=2)
 
 
+def _has_display() -> bool:
+    """Check if a display is available for tkinter."""
+    if sys.platform == "win32":
+        # Windows: try to create a hidden Tk window
+        try:
+            import tkinter as tk
+
+            root = tk.Tk()
+            root.withdraw()
+            root.destroy()
+            return True
+        except Exception:
+            return False
+    else:
+        # Linux/macOS: check DISPLAY env var
+        return bool(os.environ.get("DISPLAY"))
+
+
 @pytest.fixture(scope="module")
 def server():
     """Start TrayForge GUI in isolated test dir, yield port, then kill and clean up."""
+    if not _has_display():
+        pytest.skip("No display available (headless environment)")
     # Kill stale processes from previous failed runs
     if sys.platform == "win32":
         subprocess.run(
