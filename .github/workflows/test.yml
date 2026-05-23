@@ -1,0 +1,31 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Ruff format check
+        run: uv run ruff format --check src/ tests/
+
+      - name: Ruff lint
+        run: uv run ruff check src/ tests/
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
+        env:
+          TRAYFORGE_DATA_DIR: ${{ runner.temp }}\TrayForgeTest
