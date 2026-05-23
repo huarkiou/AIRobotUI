@@ -46,8 +46,8 @@ class TrayUI:
         items.append(Menu.SEPARATOR)
         items.append(
             MenuItem(
-                "Show/Hide Window",
-                lambda i, _: self._window.root.after(0, self._window.toggle),
+                "Show Window",
+                lambda i, _: self._window.root.after(0, self._window.show),
             )
         )
         items.append(MenuItem("Settings", lambda i, _: self._cb_settings()))
