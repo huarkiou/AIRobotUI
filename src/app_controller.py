@@ -18,6 +18,7 @@ class AppController:
         self._buffers: dict[str, list[str]] = {}
         self._last_poll = 0.0
         self._last_output = 0.0
+        self._settings_dialog = None
         self._settings_open = False
 
     # --- Settings callback ---
@@ -30,11 +31,14 @@ class AppController:
 
         def open_settings() -> None:
             if self._settings_open:
+                if self._settings_dialog is not None:
+                    self._settings_dialog.lift_to_front()
                 return
             self._settings_open = True
             logger.info("Opening settings dialog")
             try:
                 dlg = ConfigDialog(self._window.root)
+                self._settings_dialog = dlg
                 result = dlg.get_result()
                 if result is not None:
                     self._config = result
@@ -43,6 +47,7 @@ class AppController:
                     logger.info("Config updated at runtime")
             finally:
                 self._settings_open = False
+                self._settings_dialog = None
 
         return open_settings
 

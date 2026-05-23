@@ -347,6 +347,11 @@ class ConfigDialog:
         self._result = None
         self._on_close()
 
+    def lift_to_front(self) -> None:
+        self.dialog.grab_set()
+        self.dialog.lift()
+        self.dialog.focus_force()
+
     def get_result(self) -> AppConfig | None:
         self.dialog.wait_window()
         return self._result

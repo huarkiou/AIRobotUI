@@ -142,10 +142,7 @@ class MainWindow:
 
     def toggle(self) -> None:
         if self._visible:
-            self.root.deiconify()
-            self.root.lift()
-            self.root.focus_force()
-            self.root.after(150, self.hide)
+            self.hide()
         else:
             self.show()
 
