@@ -42,7 +42,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
+    if "--headless" in sys.argv:
+        from headless_controller import run_headless
+        run_headless()
+    elif len(sys.argv) > 1:
         from cli import main as cli_main
         sys.exit(cli_main())
-    main()
+    else:
+        main()
