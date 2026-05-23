@@ -20,7 +20,9 @@ def get_port() -> int | None:
 
 
 def send_request(port: int, path: str, *, method: str = "GET", name: str | None = None) -> tuple[int, str]:
-    """Send an HTTP request to the server. Returns (status_code, body_text)."""
+    """Send an HTTP request to the server. Returns (status_code, body_text).
+    status_code 0 means a transport-level error (connection refused, timeout, etc.).
+    """
     url = f"http://127.0.0.1:{port}{path}"
     if name is not None:
         url += "?" + urllib.parse.urlencode({"name": name})
@@ -30,6 +32,8 @@ def send_request(port: int, path: str, *, method: str = "GET", name: str | None 
             return resp.status, resp.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8")
+    except urllib.error.URLError:
+        return 0, "TrayForge is not running"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -101,8 +105,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         print(body)
-        # Exit 0 on 200, 1 on error codes
         return 0 if code == 200 else 1
-    except ConnectionRefusedError:
+    except Exception:
         print("TrayForge is not running")
         return 1

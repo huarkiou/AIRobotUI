@@ -62,6 +62,7 @@ def server():
     yield pm, port, reload_fn
 
     srv.shutdown()
+    srv.server_close()
 
 
 def _get(port, path) -> tuple[int, str]:
@@ -196,3 +197,36 @@ class TestUnknownEndpoint:
         _, port, _ = server
         code, body = _get(port, "/nonexistent")
         assert code == 404
+
+
+class TestWebUIMissingName:
+    def test_returns_400_when_name_missing(self, server):
+        _, port, _ = server
+        code, body = _get(port, "/webui")
+        assert code == 400
+
+
+class TestRestartUnknown:
+    def test_returns_404_for_unknown_process(self, server):
+        _, port, _ = server
+        code, body = _post(port, "/restart?name=Ghost")
+        assert code == 404
+
+
+class TestMethodIsolation:
+    def test_post_to_get_endpoint_returns_404(self, server):
+        _, port, _ = server
+        code, body = _post(port, "/list")
+        assert code == 404
+
+    def test_get_to_post_endpoint_returns_404(self, server):
+        _, port, _ = server
+        code, body = _get(port, "/start?name=NapCat")
+        assert code == 404
+
+
+class TestStartMissingName:
+    def test_returns_400_for_missing_name(self, server):
+        _, port, _ = server
+        code, body = _post(port, "/start")
+        assert code == 400

@@ -7,6 +7,15 @@ import urllib.parse
 from typing import Callable
 
 
+class _HTTPError(Exception):
+    """HTTP error with status code and message."""
+
+    def __init__(self, code: int, msg: str):
+        super().__init__(msg)
+        self.code = code
+        self.msg = msg
+
+
 class TrayForgeHTTPHandler(http.server.BaseHTTPRequestHandler):
     """HTTP handler that marshals ProcessManager operations onto tkinter main thread.
 
@@ -72,14 +81,19 @@ class TrayForgeHTTPHandler(http.server.BaseHTTPRequestHandler):
         def wrapper():
             try:
                 result_queue.put(fn())
+            except _HTTPError as e:
+                result_queue.put(e)
             except Exception as e:
                 result_queue.put(e)
             finally:
                 event.set()
 
         self.root.after(0, wrapper)
-        event.wait()
+        if not event.wait(timeout=5.0):
+            raise RuntimeError("HTTP handler timed out waiting for main thread")
         result = result_queue.get()
+        if isinstance(result, _HTTPError):
+            return result
         if isinstance(result, Exception):
             raise result
         return result
@@ -121,10 +135,10 @@ class TrayForgeHTTPHandler(http.server.BaseHTTPRequestHandler):
             self._send_error(400, "Missing name parameter")
             return
 
-        def do_status() -> str | None:
+        def do_status() -> str:
             status = self.pm.get_status(name)
             if status is None:
-                return None
+                raise _HTTPError(404, f"Unknown process: {name}")
             lines = [
                 f"Name:     {status['name']}",
                 f"Status:   {'Running' if status['running'] else 'Stopped'}",
@@ -137,8 +151,8 @@ class TrayForgeHTTPHandler(http.server.BaseHTTPRequestHandler):
             return "\n".join(lines)
 
         result = self._marshal(do_status)
-        if result is None:
-            self._send_error(404, f"Unknown process: {name}")
+        if isinstance(result, _HTTPError):
+            self._send_error(result.code, result.msg)
         else:
             self._send_text(200, result)
 
@@ -150,15 +164,15 @@ class TrayForgeHTTPHandler(http.server.BaseHTTPRequestHandler):
 
         def do_webui() -> str:
             if self.pm.get_status(name) is None:
-                return f"Unknown process: {name}"
+                raise _HTTPError(404, f"Unknown process: {name}")
             url = self.pm.get_webui_url(name)
             if url:
                 return url
             return f"{name} WebUI URL not available"
 
         result = self._marshal(do_webui)
-        if result.startswith("Unknown process:"):
-            self._send_error(404, result)
+        if isinstance(result, _HTTPError):
+            self._send_error(result.code, result.msg)
         else:
             self._send_text(200, result)
 
@@ -172,7 +186,7 @@ class TrayForgeHTTPHandler(http.server.BaseHTTPRequestHandler):
 
         def do_action() -> str:
             if self.pm.get_status(name) is None:
-                return f"Unknown process: {name}"
+                raise _HTTPError(404, f"Unknown process: {name}")
 
             if action == "start" and self.pm.is_running(name):
                 return f"{name} is already running"
@@ -185,8 +199,8 @@ class TrayForgeHTTPHandler(http.server.BaseHTTPRequestHandler):
 
         result = self._marshal(do_action)
         # Distinguish 404 (unknown process) from 200 (success/idempotent)
-        if result.startswith("Unknown process:"):
-            self._send_error(404, result)
+        if isinstance(result, _HTTPError):
+            self._send_error(result.code, result.msg)
         else:
             self._send_text(200, result)
 
@@ -210,7 +224,9 @@ def create_server(pm, root, reload_fn: Callable[[], bool]) -> http.server.HTTPSe
     Returns the server (not yet started). Caller must read server_address[1]
     for the assigned port, save it, and start serve_forever() in a thread.
     """
-    TrayForgeHTTPHandler.pm = pm
-    TrayForgeHTTPHandler.root = root
-    TrayForgeHTTPHandler.reload_fn = reload_fn
-    return http.server.HTTPServer(("127.0.0.1", 0), TrayForgeHTTPHandler)
+    class _Handler(TrayForgeHTTPHandler):
+        pass
+    _Handler.pm = pm
+    _Handler.root = root
+    _Handler.reload_fn = reload_fn
+    return http.server.HTTPServer(("127.0.0.1", 0), _Handler)

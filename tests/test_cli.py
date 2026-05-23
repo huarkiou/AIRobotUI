@@ -1,6 +1,6 @@
 """Tests for CLI argument parsing and HTTP request dispatch."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import pytest
 from cli import build_parser, main, get_port
 
@@ -118,7 +118,7 @@ class TestCLIMain:
 
     def test_connection_refused(self, capsys):
         with patch("cli.get_port", return_value=12345), patch("cli.send_request") as mock_send:
-            mock_send.side_effect = ConnectionRefusedError
+            mock_send.return_value = (0, "TrayForge is not running")
             result = main(["list"])
             captured = capsys.readouterr()
             assert "TrayForge is not running" in captured.out

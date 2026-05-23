@@ -312,3 +312,6 @@ class TestGetStatus:
         status = pm.get_status("NapCat")
         assert status["running"] is True
         assert status["pid"] == 12345
+        assert status["restarts"] == 0
+        assert status["has_webui"] is True
+        assert status["max_restarts"] == 3
