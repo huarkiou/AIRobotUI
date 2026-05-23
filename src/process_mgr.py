@@ -1,5 +1,7 @@
 """Process manager — generic dict-based process registry."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 import subprocess
 import sys
@@ -10,9 +12,13 @@ import os
 import re
 import time
 from datetime import datetime
+from typing import TYPE_CHECKING
 import psutil
 from logger import get_main_logger, get_process_logger
 from trayforge_types import ProcessConfig, AppConfig
+
+if TYPE_CHECKING:
+    from trayforge_types import ProcessStatus
 
 
 _STRIP_ANSI = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
@@ -83,7 +89,8 @@ class ProcessManager:
         ps = self._procs.get(name)
         if ps is None:
             return False
-        return ps.proc is not None and ps.proc.poll() is None
+        proc = ps.proc
+        return proc is not None and proc.poll() is None
 
     def has_webui(self, name: str) -> bool:
         ps = self._procs.get(name)
@@ -91,18 +98,17 @@ class ProcessManager:
             return False
         return ps.cfg.get("webui_pattern") is not None
 
-    def get_status(self, name: str) -> dict | None:
+    def get_status(self, name: str) -> "ProcessStatus | None":
         """Return a ProcessStatus dict for the named process, or None if unknown."""
-        from trayforge_types import ProcessStatus
-
         ps = self._procs.get(name)
         if ps is None:
             return None
-        running = ps.proc is not None and ps.proc.poll() is None
+        proc = ps.proc
+        running = proc is not None and proc.poll() is None
         result: ProcessStatus = {
             "name": name,
             "running": running,
-            "pid": ps.proc.pid if running else None,
+            "pid": proc.pid if running else None,
             "webui_url": ps.webui_url,
             "has_webui": ps.cfg.get("webui_pattern") is not None,
             "restarts": ps.restarts,
