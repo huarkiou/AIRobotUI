@@ -73,7 +73,7 @@ def _write_test_config():
             {
                 "name": "TestProc",
                 "cwd": "",
-                "cmd": f"{sys.executable} -c \"import time; time.sleep(300)\"",
+                "cmd": f'{sys.executable} -c "import time; time.sleep(300)"',
                 "encoding": "utf-8",
                 "singleton": False,
                 "autostart": False,

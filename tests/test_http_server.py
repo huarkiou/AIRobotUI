@@ -230,3 +230,84 @@ class TestStartMissingName:
         _, port, _ = server
         code, body = _post(port, "/start")
         assert code == 400
+
+
+class TestQueueHandler:
+    """Tests for QueueHandler mode (headless)."""
+
+    @pytest.fixture
+    def qserver(self):
+        """Start HTTP server with QueueHandler, drain queue in background."""
+        pm = MagicMock()
+        pm.process_names.return_value = ["NapCat"]
+        pm.is_running.return_value = False
+        pm.get_status.side_effect = lambda name: (
+            {
+                "name": "NapCat",
+                "running": False,
+                "pid": None,
+                "webui_url": None,
+                "has_webui": False,
+                "restarts": 0,
+                "max_restarts": 3,
+            }
+            if name == "NapCat"
+            else None
+        )
+        pm.start = MagicMock()
+
+        action_queue = __import__("queue").Queue()
+        reload_fn = MagicMock(return_value=True)
+
+        from http_server import QueueHandler
+
+        srv = create_server(pm, None, reload_fn, handler_cls=QueueHandler)
+        QueueHandler.action_queue = action_queue
+        port = srv.server_address[1]
+
+        # Server thread
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
+
+        # Queue drainer thread (simulates HeadlessController loop)
+        exit_flag = threading.Event()
+
+        def drain_loop():
+            import time
+
+            while not exit_flag.is_set():
+                try:
+                    while True:
+                        fn = action_queue.get_nowait()
+                        fn()
+                except __import__("queue").Empty:
+                    pass
+                time.sleep(0.05)
+
+        dt = threading.Thread(target=drain_loop, daemon=True)
+        dt.start()
+
+        yield pm, port
+
+        exit_flag.set()
+        srv.shutdown()
+
+    def test_404_for_unknown_process(self, qserver):
+        """QueueHandler should propagate _HTTPError as status code, not 500."""
+        _, port = qserver
+        code, body = _get(port, "/status?name=Ghost")
+        assert code == 404
+        assert "Unknown process" in body
+
+    def test_200_list_endpoint(self, qserver):
+        _, port = qserver
+        code, body = _get(port, "/list")
+        assert code == 200
+        assert "NapCat" in body
+
+    def test_start_dispatches_to_pm(self, qserver):
+        pm, port = qserver
+        pm.is_running.return_value = False
+        code, body = _post(port, "/start?name=NapCat")
+        assert code == 200
+        pm.start.assert_called_once_with("NapCat")

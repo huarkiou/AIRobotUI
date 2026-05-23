@@ -235,14 +235,19 @@ class QueueHandler(TrayForgeHTTPHandler):
         def wrapper():
             try:
                 result_queue.put(fn())
+            except _HTTPError as e:
+                result_queue.put(e)
             except Exception as e:
                 result_queue.put(e)
             finally:
                 event.set()
 
         self.action_queue.put(wrapper)
-        event.wait()
+        if not event.wait(timeout=5.0):
+            raise RuntimeError("QueueHandler timed out waiting for main thread")
         result = result_queue.get()
+        if isinstance(result, _HTTPError):
+            return result
         if isinstance(result, Exception):
             raise result
         return result

@@ -52,6 +52,8 @@ def headless_server():
             except __import__("queue").Empty:
                 pass
             pm.poll_crashes()
+            for name in pm.process_names():
+                pm.drain(name)
             time.sleep(0.1)
 
     ctrl_thread = threading.Thread(target=controller_loop, daemon=True)
@@ -102,6 +104,9 @@ class TestHeadless:
 
     def test_crash_poll_gets_called(self, headless_server):
         pm, port = headless_server
-        # Let loop run a few cycles
-        time.sleep(0.5)
+        # Poll until poll_crashes has been called at least once
+        deadline = time.monotonic() + 5.0
+        while pm.poll_crashes.call_count == 0 and time.monotonic() < deadline:
+            time.sleep(0.05)
         assert pm.poll_crashes.call_count > 0
+        assert pm.drain.call_count > 0
