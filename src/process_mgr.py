@@ -259,7 +259,6 @@ class ProcessManager:
         cwd: str = cfg.get("cwd", "")
         cmd: str = cfg.get("cmd", "")
         enc: str = cfg.get("encoding", "utf-8")
-        singleton: bool = cfg.get("singleton", False)
         delete_files: list[str] = cfg.get("delete_before_start", [])
 
         if not cmd or not cmd.strip():
