@@ -61,11 +61,17 @@ class TrayUI:
             action = "stop" if running else "start"
             self._enqueue(f"{action}:{name}")
 
+        def do_restart(icon, item):
+            self._enqueue(f"restart:{name}")
+
         def text(_) -> str:
             running = self._pm.is_running(name)
             indicator = "\u25cf" if running else "\u25cb"
             status = "Running" if running else "Stopped"
             return f"  {indicator} {status}"
+
+        def restart_visible(_) -> bool:
+            return self._pm.is_running(name)
 
         def webui_label(_) -> str:
             return f"  {self._pm.get_webui_url(name)}"
@@ -81,6 +87,7 @@ class TrayUI:
             self._enqueue(f"webui:{name}")
 
         items = [MenuItem(text, toggle)]
+        items.append(MenuItem("  Restart", do_restart, visible=restart_visible))
         if self._pm.has_webui(name):
             items.append(MenuItem(webui_label, open_webui, visible=webui_visible))
         return Menu(*items)

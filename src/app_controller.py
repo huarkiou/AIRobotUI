@@ -80,6 +80,8 @@ class AppController:
                 self._pm.start(name)
             elif cmd == "stop":
                 self._pm.stop(name)
+            elif cmd == "restart":
+                self._pm.restart(name)
             elif cmd == "webui":
                 url = self._pm.get_webui_url(name)
                 if url:

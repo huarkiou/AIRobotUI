@@ -60,6 +60,14 @@ class ProcessManager:
     def stop(self, name: str) -> None:
         self._stop(name)
 
+    def restart(self, name: str) -> None:
+        self._stop_internal(name)
+        ps = self._procs.get(name)
+        if ps is not None:
+            ps.restarts = 0
+        self._start(name, _reset_counter=True)
+        self._emit_status()
+
     def start_all(self) -> None:
         for name in self._procs:
             self._start(name)
