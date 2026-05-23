@@ -1,4 +1,4 @@
-"""TrayForge CLI — communicates with running GUI instance via HTTP."""
+"""TrayForge CLI - communicates with running GUI instance via HTTP."""
 
 import argparse
 import os
@@ -41,7 +41,7 @@ def send_request(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="trayforge",
-        description="TrayForge CLI — control managed processes",
+        description="TrayForge CLI - control managed processes",
     )
     sub = parser.add_subparsers(dest="command", title="commands")
 
@@ -68,6 +68,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Attach to parent console so output is visible when running
+    # from a terminal as a PyInstaller --windowed executable.
+    if sys.platform == "win32":
+        import ctypes
+
+        ctypes.windll.kernel32.AttachConsole(-1)  # ATTACH_PARENT_PROCESS
     if argv is None:
         argv = sys.argv[1:]
 
