@@ -4,6 +4,8 @@ import time
 import webbrowser
 import logging
 import os
+import threading
+from http_server import create_server
 
 
 class AppController:
@@ -20,6 +22,7 @@ class AppController:
         self._last_output = 0.0
         self._settings_dialog = None
         self._settings_open = False
+        self._http_server = None
 
     def _reload_config(self) -> bool:
         """Reload config from disk. Returns True on success."""
@@ -164,6 +167,26 @@ class AppController:
                 logger.info("Autostart: %s", name)
                 self._window.root.after(500, lambda n=name: self._pm.start(n))
 
+        # Start HTTP server for CLI control
+        self._http_server = create_server(
+            self._pm,
+            self._window.root,
+            self._reload_config,
+        )
+        port = self._http_server.server_address[1]
+        threading.Thread(
+            target=self._http_server.serve_forever,
+            daemon=True,
+            name="http-server",
+        ).start()
+        # Write port file for CLI discovery
+        from config import get_data_dir
+
+        port_file = os.path.join(get_data_dir(), "cli_port.txt")
+        with open(port_file, "w") as f:
+            f.write(str(port))
+        logger.info("HTTP server listening on 127.0.0.1:%d", port)
+
         # Start event loop
         self._window.root.after(100, self._tick)
 
@@ -179,6 +202,17 @@ class AppController:
 
         logger = get_main_logger()
         logger.info("Exit: hiding window, shutting down...")
+        # Shutdown HTTP server
+        if self._http_server:
+            logger.info("Stopping HTTP server")
+            self._http_server.shutdown()
+            from config import get_data_dir
+
+            port_file = os.path.join(get_data_dir(), "cli_port.txt")
+            try:
+                os.remove(port_file)
+            except OSError:
+                pass
         # Flush remaining output
         for name in self._pm.process_names():
             buf = self._buffers.get(name)
