@@ -15,13 +15,10 @@ def _get_exe_path() -> str:
         # Running as compiled EXE
         return sys.executable
     else:
-        # Running from source - use batch file in project root
+        # Running from source - use Python with script path
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(script_dir)
-        bat_path = os.path.join(project_root, "trayforge.bat")
-        if os.path.exists(bat_path):
-            return bat_path
-        return sys.executable
+        main_script = os.path.join(script_dir, "main.pyw")
+        return f'"{sys.executable}" "{main_script}"'}
 
 
 def is_autostart_enabled() -> bool:

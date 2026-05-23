@@ -36,7 +36,6 @@ uv sync
 uv run python src/main.pyw
 ```
 
-或双击 `trayforge.bat`。
 
 ### 打包
 
