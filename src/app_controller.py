@@ -21,6 +21,23 @@ class AppController:
         self._settings_dialog = None
         self._settings_open = False
 
+    def _reload_config(self) -> bool:
+        """Reload config from disk. Returns True on success."""
+        from logger import get_main_logger
+        from config import load_config
+
+        logger = get_main_logger()
+        config = load_config()
+        if config:
+            self._config = config
+            self._pm.update_config(config)
+            self._window.set_processes(self._pm.process_names())
+            logger.info("Config reloaded from disk")
+            return True
+        else:
+            logger.error("Failed to reload config — config file missing or corrupted")
+            return False
+
     # --- Settings callback ---
 
     def _make_settings_callback(self) -> callable:
@@ -64,16 +81,7 @@ class AppController:
         elif action == "stopall":
             self._pm.stop_all()
         elif action == "reload":
-            from config import load_config
-
-            config = load_config()
-            if config:
-                self._config = config
-                self._pm.update_config(config)
-                self._window.set_processes(self._pm.process_names())
-                logger.info("Config reloaded from disk")
-            else:
-                logger.error("Failed to reload config — config file missing or corrupted")
+            self._reload_config()
         elif ":" in action:
             cmd, _, name = action.partition(":")
             if cmd == "start":
