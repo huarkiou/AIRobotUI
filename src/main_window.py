@@ -56,13 +56,13 @@ class MainWindow:
 
     def set_processes(self, names: list[str]) -> None:
         """Rebuild tabs to match the given process name list. Preserves existing tabs."""
-        # Remove tabs not in names
-        for name in list(self._tabs.keys()):
-            if name not in names:
-                text_widget = self._tabs[name]
-                outer_frame = text_widget.master.master  # ttk.Frame
-                self.notebook.forget(outer_frame)
-                del self._tabs[name]
+        # Remove tabs not in names — use notebook API to find tabs by name
+        for tab_id in self.notebook.tabs():
+            tab_name = self.notebook.tab(tab_id, "text")
+            if tab_name not in names:
+                self.notebook.forget(tab_id)
+                if tab_name in self._tabs:
+                    del self._tabs[tab_name]
 
         # Add new tabs
         for name in names:

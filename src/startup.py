@@ -18,7 +18,7 @@ def _get_exe_path() -> str:
         # Running from source - use Python with script path
         script_dir = os.path.dirname(os.path.abspath(__file__))
         main_script = os.path.join(script_dir, "main.pyw")
-        return f'"{sys.executable}" "{main_script}"'}
+        return f'"{sys.executable}" "{main_script}"'
 
 
 def is_autostart_enabled() -> bool:

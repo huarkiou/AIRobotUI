@@ -117,11 +117,16 @@ class ConfigDialog:
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
         )
-        canvas.create_window((0, 0), window=self._proc_frame, anchor=tk.NW)
+        self._canvas_window = canvas.create_window((0, 0), window=self._proc_frame, anchor=tk.NW)
         canvas.configure(yscrollcommand=scrollbar.set)
 
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        def _on_canvas_resize(event):
+            canvas.itemconfig(self._canvas_window, width=event.width)
+
+        canvas.bind("<Configure>", _on_canvas_resize, add="+")
 
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
@@ -136,24 +141,12 @@ class ConfigDialog:
         if not self._blocking:
             ttk.Button(btn_frame, text="Cancel", command=self._on_cancel).pack(side=tk.RIGHT)
 
-    def _add_process(self, defaults: dict | None = None) -> None:
-        if defaults is None:
-            defaults = {
-                "name": "",
-                "cwd": "",
-                "cmd": "",
-                "encoding": "utf-8",
-                "singleton": False,
-                "autostart": False,
-                "cleanup_cwd": False,
-                "webui_pattern": "",
-                "delete_before_start": "",
-            }
+    # --- Process row construction ---
 
-        idx = len(self._proc_entries)
-        frame = ttk.LabelFrame(self._proc_frame, text=f"Process {idx + 1}", padding=5)
-        frame.pack(fill=tk.X, pady=2)
-
+    def _build_process_row(self, frame: ttk.LabelFrame, defaults: dict) -> dict[str, tk.Variable]:
+        """Populate a LabelFrame with process config widgets. Returns vars dict.
+        Does NOT pack the frame — caller is responsible for that.
+        """
         v: dict[str, tk.Variable] = {}
 
         # Row 0: Name
@@ -191,7 +184,7 @@ class ConfigDialog:
             state="readonly",
         ).grid(row=3, column=1, sticky=tk.W, padx=5)
 
-        # Row 4: Singleton, Autostart
+        # Row 4: Singleton, Autostart, Cleanup CWD
         check_frame = ttk.Frame(frame)
         check_frame.grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=2)
         v["singleton"] = tk.BooleanVar(value=defaults["singleton"])
@@ -222,21 +215,123 @@ class ConfigDialog:
             row=7, column=1, columnspan=2, sticky=tk.W, padx=5
         )
 
-        # Delete button
-        ttk.Button(
-            frame,
-            text="Delete",
-            command=lambda f=frame, idx=idx: self._delete_process(f, idx),
-        ).grid(row=8, column=2, sticky=tk.E, pady=(5, 0))
+        # Row 8: Action buttons (Copy, ▲, ▼, Delete)
+        btn_frame = ttk.Frame(frame)
+        btn_frame.grid(row=8, column=0, columnspan=3, sticky=tk.E, pady=(5, 0))
+        ttk.Button(btn_frame, text="▲", width=3, command=lambda f=frame: self._move_up(f)).pack(
+            side=tk.LEFT, padx=(0, 2)
+        )
+        ttk.Button(btn_frame, text="▼", width=3, command=lambda f=frame: self._move_down(f)).pack(
+            side=tk.LEFT, padx=(0, 6)
+        )
+        ttk.Button(btn_frame, text="Copy", command=lambda f=frame: self._copy_process(f)).pack(
+            side=tk.LEFT, padx=(0, 2)
+        )
+        ttk.Button(btn_frame, text="Delete", command=lambda f=frame: self._delete_process(f)).pack(
+            side=tk.LEFT
+        )
 
         frame.columnconfigure(1, weight=1)
-        self._proc_entries.append({"frame": frame, "vars": v})
+        return v
 
-    def _delete_process(self, frame: ttk.Frame, idx: int) -> None:
-        frame.destroy()
-        del self._proc_entries[idx]
+    # --- Process list manipulation ---
+
+    def _find_index(self, frame: ttk.Frame) -> int | None:
+        for i, entry in enumerate(self._proc_entries):
+            if entry["frame"] is frame:
+                return i
+        return None
+
+    def _renumber(self) -> None:
         for i, entry in enumerate(self._proc_entries):
             entry["frame"].configure(text=f"Process {i + 1}")
+
+    def _repack(self) -> None:
+        """Re-pack all frames in list order (for after insert/swap)."""
+        for entry in self._proc_entries:
+            entry["frame"].pack_forget()
+        for entry in self._proc_entries:
+            entry["frame"].pack(fill=tk.X, pady=2)
+        self._proc_frame.update_idletasks()
+
+    def _add_process(self, defaults: dict | None = None) -> None:
+        if defaults is None:
+            defaults = {
+                "name": "",
+                "cwd": "",
+                "cmd": "",
+                "encoding": "utf-8",
+                "singleton": False,
+                "autostart": False,
+                "cleanup_cwd": False,
+                "webui_pattern": "",
+                "delete_before_start": "",
+            }
+
+        frame = ttk.LabelFrame(
+            self._proc_frame,
+            text=f"Process {len(self._proc_entries) + 1}",
+            padding=5,
+        )
+        v = self._build_process_row(frame, defaults)
+        frame.pack(fill=tk.X, pady=2)
+        self._proc_entries.append({"frame": frame, "vars": v})
+
+    def _insert_process(self, idx: int, defaults: dict) -> None:
+        """Insert a new process entry at the given index, then renumber + repack."""
+        frame = ttk.LabelFrame(self._proc_frame, padding=5)
+        v = self._build_process_row(frame, defaults)
+        self._proc_entries.insert(idx, {"frame": frame, "vars": v})
+        self._renumber()
+        self._repack()
+
+    def _copy_process(self, frame: ttk.Frame) -> None:
+        idx = self._find_index(frame)
+        if idx is None:
+            return
+        v = self._proc_entries[idx]["vars"]
+        defaults = {
+            "name": v["name"].get(),
+            "cwd": v["cwd"].get(),
+            "cmd": v["cmd"].get(),
+            "encoding": v["encoding"].get(),
+            "singleton": v["singleton"].get(),
+            "autostart": v["autostart"].get(),
+            "cleanup_cwd": v["cleanup_cwd"].get(),
+            "webui_pattern": v["webui_pattern"].get(),
+            "delete_before_start": v["delete_before_start"].get(),
+        }
+        self._insert_process(idx + 1, defaults)
+
+    def _move_up(self, frame: ttk.Frame) -> None:
+        idx = self._find_index(frame)
+        if idx is None or idx <= 0:
+            return
+        self._proc_entries[idx], self._proc_entries[idx - 1] = (
+            self._proc_entries[idx - 1],
+            self._proc_entries[idx],
+        )
+        self._renumber()
+        self._repack()
+
+    def _move_down(self, frame: ttk.Frame) -> None:
+        idx = self._find_index(frame)
+        if idx is None or idx >= len(self._proc_entries) - 1:
+            return
+        self._proc_entries[idx], self._proc_entries[idx + 1] = (
+            self._proc_entries[idx + 1],
+            self._proc_entries[idx],
+        )
+        self._renumber()
+        self._repack()
+
+    def _delete_process(self, frame: ttk.Frame) -> None:
+        idx = self._find_index(frame)
+        if idx is None:
+            return
+        frame.destroy()
+        del self._proc_entries[idx]
+        self._renumber()
 
     def _browse_dir(self, var: tk.StringVar) -> None:
         path = filedialog.askdirectory(title="Select Working Directory")
