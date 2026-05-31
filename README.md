@@ -68,7 +68,7 @@ TrayForge/
 │   └── trayforge_types.py  # 类型定义（ProcessConfig, AppConfig, ProcessStatus）
 ├── assets/                 # 静态资源
 │   └── icon.ico
-├── tests/                  # 测试（131 tests）
+├── tests/                  # 测试（134 tests）
 ├── docs/                   # 设计文档
 ├── pyproject.toml
 ├── build.bat

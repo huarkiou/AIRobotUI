@@ -2,8 +2,12 @@
 
 import json
 import os
+import shutil
+from datetime import datetime
 from logger import get_main_logger
 from trayforge_types import AppConfig
+
+BACKUP_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 def get_data_dir() -> str:
@@ -75,12 +79,16 @@ def load_config() -> AppConfig | None:
 
 
 def save_config(config: AppConfig) -> bool:
-    """Save config to file. Returns True on success."""
+    """Save config to file, with backup. Returns True on success."""
     logger = get_main_logger()
     config_path = _get_config_path()
 
     try:
         os.makedirs(os.path.dirname(config_path), exist_ok=True)
+
+        # Backup existing config before overwriting
+        _backup_config(config_path, logger)
+
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
         logger.info("Config saved to %s", config_path)
@@ -88,3 +96,50 @@ def save_config(config: AppConfig) -> bool:
     except IOError as e:
         logger.error("Failed to save config: %s", e)
         return False
+
+
+def _backup_config(config_path: str, logger) -> None:
+    """Copy existing config to backups/ with timestamp, prune if > BACKUP_MAX_BYTES."""
+    if not os.path.exists(config_path):
+        return
+
+    backup_dir = os.path.join(os.path.dirname(config_path), "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+
+    now = datetime.now()
+    ts = now.strftime("%Y-%m-%d-%H%M%S") + f"-{now.microsecond // 1000:03d}"
+    backup_name = f"config.{ts}.json"
+    backup_path = os.path.join(backup_dir, backup_name)
+
+    try:
+        shutil.copy2(config_path, backup_path)
+        logger.info("Config backup: %s", backup_name)
+    except IOError as e:
+        logger.warning("Failed to create backup: %s", e)
+        return
+
+    _prune_backups(backup_dir, logger)
+
+
+def _prune_backups(backup_dir: str, logger) -> None:
+    """Remove oldest backup files until total size <= BACKUP_MAX_BYTES."""
+    files = []
+    try:
+        for name in os.listdir(backup_dir):
+            path = os.path.join(backup_dir, name)
+            if os.path.isfile(path) and name.startswith("config.") and name.endswith(".json"):
+                files.append((path, os.path.getsize(path)))
+    except OSError:
+        return
+
+    files.sort(key=lambda x: x[0])  # sort by path (timestamp in name = chronological)
+    total = sum(sz for _, sz in files)
+
+    while total > BACKUP_MAX_BYTES and files:
+        oldest_path, oldest_sz = files.pop(0)
+        try:
+            os.remove(oldest_path)
+            total -= oldest_sz
+            logger.debug("Pruned old backup: %s", os.path.basename(oldest_path))
+        except OSError:
+            pass
