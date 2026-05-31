@@ -15,7 +15,7 @@ Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、As
 - **Reload Config** 运行时重载配置，无需重启
 - 动态 Tab 实时查看每个进程的输出
 - 进程崩溃自动重启（60s 冷却，最多 3 次）
-- Settings 图形化配置：添加/删除/编辑进程，全局参数调整
+- Settings 图形化配置：添加/删除/复制/上移/下移进程，Cmd 多行编辑，全局参数调整
 - 每进程独立日志文件
 - 开机自启（主程序 + 每进程独立控制）
 - 单实例运行保护
@@ -32,7 +32,6 @@ Windows 系统托盘应用，通用进程管理器，一键管理 NapCat QQ、As
 ```bash
 git clone <repo>
 cd TrayForge
-uv sync
 uv run python src/main.pyw
 ```
 
@@ -40,7 +39,6 @@ uv run python src/main.pyw
 ### 打包
 
 ```bash
-uv sync
 build.bat
 # 输出：dist/TrayForge.exe
 ```
@@ -50,7 +48,7 @@ build.bat
 ```
 TrayForge/
 ├── .github/workflows/      # CI/CD
-│   ├── format-check.yml    # 代码格式检查
+│   ├── test.yml            # 测试 + ruff 格式/lint 检查
 │   └── release.yml         # 手动发布 exe
 ├── src/                    # 源码
 │   ├── main.pyw            # 入口（无参=GUI，有参=CLI，--headless=后台）
@@ -70,7 +68,7 @@ TrayForge/
 │   └── trayforge_types.py  # 类型定义（ProcessConfig, AppConfig, ProcessStatus）
 ├── assets/                 # 静态资源
 │   └── icon.ico
-├── tests/                  # 测试（79 tests）
+├── tests/                  # 测试（131 tests）
 ├── docs/                   # 设计文档
 ├── pyproject.toml
 ├── build.bat
