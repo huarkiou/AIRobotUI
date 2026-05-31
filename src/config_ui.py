@@ -170,8 +170,11 @@ class ConfigDialog:
         ttk.Label(frame, text="Cmd:").grid(row=2, column=0, sticky=tk.W, pady=1)
         v["cmd"] = tk.StringVar(value=defaults["cmd"])
         ttk.Entry(frame, textvariable=v["cmd"], width=50).grid(
-            row=2, column=1, columnspan=2, sticky=tk.EW, padx=5
+            row=2, column=1, sticky=tk.EW, padx=(5, 0)
         )
+        ttk.Button(
+            frame, text="...", width=3, command=lambda var=v["cmd"]: self._edit_cmd(var)
+        ).grid(row=2, column=2)
 
         # Row 3: Encoding
         ttk.Label(frame, text="Encoding:").grid(row=3, column=0, sticky=tk.W, pady=1)
@@ -337,6 +340,62 @@ class ConfigDialog:
         path = filedialog.askdirectory(title="Select Working Directory")
         if path:
             var.set(path)
+
+    def _edit_cmd(self, var: tk.StringVar) -> None:
+        """Open a multi-line editor dialog for the command string."""
+        dlg = tk.Toplevel(self.dialog)
+        dlg.title("Edit Command")
+        dlg.transient(self.dialog)
+        dlg.geometry("640x220")
+        dlg.resizable(True, True)
+        dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
+
+        dlg.update_idletasks()
+        px = self.dialog.winfo_x()
+        py = self.dialog.winfo_y()
+        pw = self.dialog.winfo_width()
+        ph = self.dialog.winfo_height()
+        dx = px + (pw - 640) // 2
+        dy = py + (ph - 220) // 2
+        dlg.geometry(f"640x220+{max(0, dx)}+{max(0, dy)}")
+
+        # Buttons pinned to bottom, packed first
+        btn_frame = ttk.Frame(dlg)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+        ttk.Label(btn_frame, text="Ctrl+Enter to save", foreground="gray").pack(side=tk.LEFT)
+
+        def _on_save():
+            # Collapse newlines to spaces: the Text widget allows multi-line
+            # editing for readability, but the command itself is a single line.
+            cmd = text.get("1.0", "end-1c").rstrip()
+            var.set(cmd.replace("\n", " "))
+            dlg.destroy()
+
+        ttk.Button(btn_frame, text="Save", command=_on_save).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=dlg.destroy).pack(side=tk.RIGHT)
+
+        # Text with scrollbar fills remaining space
+        text_frame = ttk.Frame(dlg)
+        text_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(10, 0))
+
+        scrollbar = ttk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        text = tk.Text(
+            text_frame,
+            font=("Consolas", 10),
+            wrap=tk.WORD,
+            undo=True,
+            yscrollcommand=scrollbar.set,
+        )
+        text.insert("1.0", var.get())
+        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text.yview)
+
+        text.bind("<Control-Return>", lambda e: _on_save())
+        text.focus_set()
+        dlg.grab_set()
+        dlg.wait_window()
 
     def _load_current_config(self) -> None:
         config = load_config()
